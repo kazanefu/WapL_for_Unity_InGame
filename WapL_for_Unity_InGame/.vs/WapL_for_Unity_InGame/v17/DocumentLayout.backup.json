@@ -1,0 +1,41 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|c:\\users\\hayate\\unityprojects\\wapl_for_ingameinterpreter\\wapl_for_unity_ingame\\assets\\resouces\\waplinterpreter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|solutionrelative:assets\\resouces\\waplinterpreter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "WapLInterpreter.cs",
+              "DocumentMoniker": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpreter.cs",
+              "RelativeDocumentMoniker": "Assets\\Resouces\\WapLInterpreter.cs",
+              "ToolTip": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpreter.cs",
+              "RelativeToolTip": "Assets\\Resouces\\WapLInterpreter.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAH0BAABEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-07T10:29:39.954Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
