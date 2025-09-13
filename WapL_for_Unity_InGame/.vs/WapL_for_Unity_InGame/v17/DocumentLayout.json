@@ -7,7 +7,7 @@
       "RelativeMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|solutionrelative:assets\\resouces\\waplinterpreter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|c:\\users\\hayate\\unityprojects\\wapl_for_ingameinterpreter\\wapl_for_unity_ingame\\assets\\resouces\\readandcall.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\assets\\resouces\\readandcall.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|solutionrelative:assets\\resouces\\readandcall.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -18,8 +18,12 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 2,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 1,
@@ -30,8 +34,7 @@
               "RelativeToolTip": "Assets\\Resouces\\ReadandCall.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAABEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-07T10:51:12.79Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-07T10:51:12.79Z"
             },
             {
               "$type": "Document",
@@ -41,14 +44,10 @@
               "RelativeDocumentMoniker": "Assets\\Resouces\\WapLInterpreter.cs",
               "ToolTip": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpreter.cs",
               "RelativeToolTip": "Assets\\Resouces\\WapLInterpreter.cs",
-              "ViewState": "AgIAADYAAAAAAAAAAAAmwCwAAAARAAAAAAAAAA==",
+              "ViewState": "AgIAAEEBAAAAAAAAAAAkwFsBAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-09-07T10:29:39.954Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
             }
           ]
         }

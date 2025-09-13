@@ -6,7 +6,7 @@ using System.IO;
 
 class Variable
 {
-    public string Type; // "number", "text", "bool"
+    public string Type; // "number", "text", "bool", "vec3", "gameobject", "component"
     public string Value;
 }
 
@@ -40,6 +40,10 @@ public class WapLInterpreter : MonoBehaviour
     public void ReadInput()
     {
         input = inputfield.text;
+    }
+    public void ReadInputFromString(string code)
+    {
+        input = code;
     }
 
     public float RunCode()
@@ -102,7 +106,7 @@ public class WapLInterpreter : MonoBehaviour
             string trimmed = commands[i].Trim();
             if (string.IsNullOrWhiteSpace(trimmed)) continue;
 
-            if (trimmed.StartsWith("func "))
+            if (trimmed.StartsWith("fn "))
             {
                 string head = trimmed.Substring(5);
                 int lparen = head.IndexOf('(');
@@ -127,11 +131,6 @@ public class WapLInterpreter : MonoBehaviour
                     body.Add(commands[i].Trim());
                     i++;
                 }
-                //functions[funcName] = new Function
-                //{
-                //    Parameters = parameters,
-                //    Body = body
-                //};
                 continue;
             }
 
@@ -182,7 +181,6 @@ public class WapLInterpreter : MonoBehaviour
         if (line.StartsWith("Print "))
         {
             string val = EvaluateExpression(line.Substring(6), localScope);
-            //Console.WriteLine(val);
             output += "\n" + val;
             outputfield.text = output;
         }
@@ -329,6 +327,26 @@ public class WapLInterpreter : MonoBehaviour
                 }
             }
 
+            if(variables.ContainsKey(op) && variables[op].Type == "vec3")
+            {
+                string exprInputV3 = variables[op].Value;
+                int lparenV3 = exprInputV3.IndexOf('(');
+                string opV3 = exprInputV3.Substring(0, lparenV3);
+                string insideV3 = exprInput.Substring(lparenV3 + 1, exprInputV3.Length - lparenV3 - 2);
+                string[] partsV3 = SplitArgs(insideV3);
+                if (parts[0] == "x")
+                {
+                    return partsV3[0];
+                }
+                else if(parts[0] == "y")
+                {
+                    return partsV3[1];
+                }
+                else if (parts[0] == "z")
+                {
+                    return partsV3[2];
+                }
+            }
 
             switch (op)
             {
@@ -358,7 +376,7 @@ public class WapLInterpreter : MonoBehaviour
                     string type = evalpart[0].Trim();  // parts[0]
                     string name = evalpart[1].Trim();  // parts[1]
                     string value = evalpart[2].Trim(); // parts[2]
-                    if (type == "number" || type == "bool")
+                    if (type == "number" || type == "bool"||type == "vec3")
                     {
                         string eval = EvaluateExpression(value, scope);
                         SetVariable(parts[1], type, eval, scope);
@@ -403,6 +421,9 @@ public class WapLInterpreter : MonoBehaviour
 
                     string result = ExecuteFunctionBody(todo, localVars);
                     return result;
+                case "vec3":
+                    string vector_three = "vec3(" + evalpart[0] + "," + evalpart[1] + "," + evalpart[2] + ")";
+                    return vector_three;
             }
 
             if (functions.ContainsKey(op))
