@@ -1506,8 +1506,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5331639954206079994}
-  - component: {fileID: -1443439524823468437}
-  - component: {fileID: 5626298645736003337}
+  - component: {fileID: 4795963336110263665}
+  - component: {fileID: 7397184776884656569}
   m_Layer: 0
   m_Name: IO_UI
   m_TagString: Untagged
@@ -1531,7 +1531,7 @@ Transform:
   - {fileID: 3953742428384430598}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &-1443439524823468437
+--- !u!114 &4795963336110263665
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1540,14 +1540,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 6935466645024693228}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46be92d0646647b4791ea81da6448c0a, type: 3}
+  m_Script: {fileID: 11500000, guid: 7a2921b83b8c4614495a1667e3936129, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   inputfield: {fileID: 5464382062635664589}
   input: 
   outputfield: {fileID: 6760739334129469365}
   output: 
---- !u!114 &5626298645736003337
+--- !u!114 &7397184776884656569
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1560,7 +1560,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   interpreterobj: {fileID: 6935466645024693228}
-  interpreter: {fileID: 0}
+  interpreter: {fileID: 4795963336110263665}
 --- !u!1 &7478746762693373308
 GameObject:
   m_ObjectHideFlags: 0
