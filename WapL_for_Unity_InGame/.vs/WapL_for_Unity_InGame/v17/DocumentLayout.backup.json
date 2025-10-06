@@ -26,8 +26,12 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -36,14 +40,10 @@
               "RelativeDocumentMoniker": "Assets\\Resouces\\WapLInterpreter.cs",
               "ToolTip": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpreter.cs",
               "RelativeToolTip": "Assets\\Resouces\\WapLInterpreter.cs",
-              "ViewState": "AgIAAMIAAAAAAAAAAAAAAOAAAAA0AAAAAAAAAA==",
+              "ViewState": "AgIAABUCAAAAAAAAAAAAAKYAAAAwAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-05T11:19:17.654Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
             },
             {
               "$type": "Document",

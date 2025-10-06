@@ -1,8 +1,10 @@
-using UnityEngine;
-using UnityEngine.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.UI;
 
 
 abstract record VariableValue;
@@ -15,11 +17,22 @@ record StringValue(string Data) : VariableValue;
 record BoolValue(bool Data) : VariableValue;
 record Vec3Value(Vector3 Data) : VariableValue;
 record NullableValue(string Data) : VariableValue;
+record PointerValue(int Data): VariableValue;
 
-
+class EmptyArea
+{
+    public int start;
+    public int size;
+}
+class Memory
+{
+    public VariableValue[] memory;
+    public List<EmptyArea> emptyArea;
+}
 class Variable
 {
     public string Type; // "i32","f32", "String", "bool", "vec3", "gameobject", "component"
+    public int ptr;
     public VariableValue Value;
 }
 
@@ -34,6 +47,7 @@ public class WapLInterpreter : MonoBehaviour
     Dictionary<string, Variable> variables = new Dictionary<string, Variable>();
     Dictionary<string, Function> functions = new Dictionary<string, Function>();
     Dictionary<string, int> labelPositions = new Dictionary<string, int>();
+    Memory vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
     public InputField inputfield;
     public string input;
     public Text outputfield;
@@ -61,6 +75,15 @@ public class WapLInterpreter : MonoBehaviour
 
     public float RunCode()
     {
+        functions = new Dictionary<string, Function>();
+        variables = new Dictionary<string, Variable>();
+        labelPositions = new Dictionary<string, int>();
+        vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
+        for (int i = 0;i < 10000; i++)
+        {
+            vmemory.memory[i] = new NullableValue("");
+        }
+        vmemory.emptyArea.Add(new EmptyArea { start = 0, size = 10000 });
         float used_energy = 0.0f;
         string[] commands = input.Split(';');
 
@@ -284,7 +307,12 @@ public class WapLInterpreter : MonoBehaviour
             if (line.StartsWith("return "))
             {
                 string retExpr = line.Substring(7).Trim();
-                return EvaluateExpression(retExpr, scope); // © ‚±‚±‚Å’l‚ð•Ô‚·
+                VariableValue ret = EvaluateExpression(retExpr, scope);
+                foreach (var j in scope)
+                {
+                    if (!j.Key.StartsWith("ref_")) { free(j.Value.ptr, 1); }
+                }
+                return ret; // © ‚±‚±‚Å’l‚ð•Ô‚·
             }
 
             EvaluateCommand(line, scope);
@@ -297,8 +325,8 @@ public class WapLInterpreter : MonoBehaviour
         if (exprInput.StartsWith("\"") && exprInput.EndsWith("\"")) return new StringValue(exprInput.Substring(1, exprInput.Length - 2));
         if (double.TryParse(exprInput, out double n)) return new F64Value(n);
         if (exprInput == "true") { return new BoolValue(true); }else if(exprInput == "false") { return new BoolValue(false); }
-        if ((scope != null && scope.ContainsKey(exprInput))) return scope[exprInput].Value;
-        if (variables.ContainsKey(exprInput)) return variables[exprInput].Value;
+        if ((scope != null && scope.ContainsKey(exprInput))) { scope[exprInput].Value = vmemory.memory[scope[exprInput].ptr]; return scope[exprInput].Value; }
+        if (variables.ContainsKey(exprInput)) { variables[exprInput].Value = vmemory.memory[variables[exprInput].ptr]; return variables[exprInput].Value; }
 
         if (exprInput.Contains("(") && exprInput.EndsWith(")"))
         {
@@ -372,22 +400,7 @@ public class WapLInterpreter : MonoBehaviour
                     VariableValue value = evalpart[1]; // parts[1]
                     SetVariable(name, type, value, scope);
                     return value;
-                    //if (type == "number" || type == "bool" || type == "vec3")
-                    //{
-                    //    SetVariable(parts[1], type, value, scope);
-                    //    return value;
-                    //}
-                    //else if (type == "text")
-                    //{
-                    //    // •¶Žš—ñ‚È‚çˆÍ‚Ý‚ðœ‹Ž
-                    //    if (value.StartsWith("\"") && value.EndsWith("\""))
-                    //    {
-                    //        value = value.Substring(1, value.Length - 2);
-                    //    }
-                    //    SetVariable(name, type, value, scope);
-                    //    return value;
-                    //}
-                    //return new VariableValue { Type = "", I32 = 0, F32 = 0f, Str = "", Bool = false, Vec3 = new Vector3(0f, 0f, 0f) };
+                    
                 case "input":
                     //ƒQ[ƒ€“à‚ÅƒRƒ“ƒ\[ƒ‹‚Ì“ü—Í‚ÍŽó‚¯‚È‚¢‚Ì‚Å”pŽ~
                     //string input_name = evalpart[0];
@@ -420,6 +433,18 @@ public class WapLInterpreter : MonoBehaviour
                 case "vec3":
                     Vec3Value vector_three = new Vec3Value(new Vector3(VariableToFloat(evalpart[0]), VariableToFloat(evalpart[1]), VariableToFloat(evalpart[2])));
                     return vector_three;
+                case "ptr":
+                    Debug.Log("ptr Called");
+                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){ Debug.Log(scope[parts[0].Trim()].ptr); return new PointerValue(scope[parts[0].Trim()].ptr); } 
+                    else if(variables.ContainsKey(parts[0].Trim())) { Debug.Log(variables[parts[0].Trim()].ptr); return new PointerValue(variables[parts[0].Trim()].ptr); }
+                    else { return new NullableValue(""); }
+                case "alias":
+                    int a_ptr = (int)VariableToDouble(evalpart[1]);
+                    string a_type = "String";
+                    string a_name = parts[0].Trim();  // parts[0]
+                    VariableValue a_value = evalpart[1]; // parts[1]
+                    SetVariableWithPtr(a_ptr, a_name, a_type, vmemory.memory[a_ptr], scope);
+                    return a_value;
             }
 
             if (functions.ContainsKey(op))
@@ -430,7 +455,16 @@ public class WapLInterpreter : MonoBehaviour
                 for (int j = 0; j < func.Parameters.Count; j++)
                 {
                     VariableValue val = EvaluateExpression(parts[j].Trim(), scope);
-                    localVars[func.Parameters[j].Name] = new Variable { Type = func.Parameters[j].Type, Value = val };
+                    if (func.Parameters[j].Name.StartsWith("ref_"))
+                    {
+                        int ptr = (int)VariableToDouble(val);
+                        SetVariableWithPtr(ptr, func.Parameters[j].Name, func.Parameters[j].Type, vmemory.memory[ptr], localVars);
+                    }
+                    else
+                    {
+                        SetVariable(func.Parameters[j].Name, func.Parameters[j].Type, val, localVars);
+                        //localVars[func.Parameters[j].Name] = new Variable { Type = func.Parameters[j].Type, Value = val };
+                    }
                 }
                 VariableValue result = ExecuteFunctionBody(func.Body, localVars);
                 return result;
@@ -461,10 +495,47 @@ public class WapLInterpreter : MonoBehaviour
     {
 
         VariableValue value_new = TypeAjust(type,value);
+        if (scope != null) 
+        {
+            if (scope.ContainsKey(name))
+            {
+                scope[name] = new Variable { Type = type, Value = value_new, ptr = scope[name].ptr };
+            }
+            else
+            {
+                int pointer = alloc(1);
+                scope[name] = new Variable { Type = type, Value = value_new, ptr = pointer };
+            }
+            vmemory.memory[scope[name].ptr] = value_new;
+        }
+        else 
+        {
+            if (variables.ContainsKey(name))
+            {
+                variables[name] = new Variable { Type = type, Value = value_new , ptr = variables[name].ptr };
+            }
+            else
+            {
+                int pointer = alloc(1);
+                variables[name] = new Variable { Type = type, Value = value_new, ptr = pointer };
+            }
+            vmemory.memory[variables[name].ptr] = value_new;
+
+        }
+            
+    }
+    void SetVariableWithPtr(int ptr, string name, string type, VariableValue value, Dictionary<string, Variable>? scope = null)
+    {
+        VariableValue value_new = TypeAjust(type, value);
         if (scope != null)
-            scope[name] = new Variable { Type = type, Value = value_new };
+        {
+            scope[name] = new Variable { Type = type, Value = value_new, ptr = ptr };
+        }
         else
-            variables[name] = new Variable { Type = type, Value = value_new };
+        {
+            variables[name] = new Variable { Type = type, Value = value_new, ptr = ptr };
+        }
+
     }
 
     double VariableToDouble(VariableValue value)
@@ -476,6 +547,7 @@ public class WapLInterpreter : MonoBehaviour
             case I64Value(var l): val = l; break;
             case F32Value(var f): val = f; break;
             case F64Value(var d): val = d; break;
+            case PointerValue(var p): val = p; break;
         }
         return val;
     }
@@ -508,6 +580,7 @@ public class WapLInterpreter : MonoBehaviour
             case StringValue(var s): s_val = s; break;
             case BoolValue(var b): b_val = b; break;
             case Vec3Value(var v): v3_val = v; break;
+            case PointerValue(var p):val = p;break;
         }
         switch (type)
         {
@@ -518,6 +591,7 @@ public class WapLInterpreter : MonoBehaviour
             case "String": return new StringValue(s_val);
             case "bool": return new BoolValue(b_val);
             case "vec3": return new Vec3Value(v3_val);
+            case "ptr": return new PointerValue((int)val);
             default: return value;
         }
     }
@@ -532,7 +606,8 @@ public class WapLInterpreter : MonoBehaviour
             case F64Value(var d): ret = "f64"; break;
             case StringValue(var s): ret = "String"; break;
             case BoolValue(var b): ret = "bool"; break;
-            case Vec3Value(var v3): ret = "Vec3"; break;
+            case Vec3Value(var v3): ret = "vec3"; break;
+            case PointerValue(var p): ret = "ptr"; break;
         }
         return ret;
     }
@@ -565,8 +640,27 @@ public class WapLInterpreter : MonoBehaviour
             case I32Value(var i): s_val = i.ToString(); break;
             case StringValue(var s): s_val = s; break;
             case BoolValue(var b): s_val = b.ToString(); break;
+            case PointerValue(var p): s_val = p.ToString();break;
+            case NullableValue(var n): s_val = "Null";break;
         }
         return new StringValue(s_val);
+    }
+    int alloc(int size)
+    {
+        int start = vmemory.emptyArea[0].start;
+        int pre_size = vmemory.emptyArea[0].size;
+        vmemory.emptyArea.RemoveAt(0);
+        vmemory.emptyArea.Add(new EmptyArea { start = start + size, size = pre_size - size });
+
+        return start;
+    }
+    void free(int ptr,int size)
+    {
+        for(int i = 0;i < size; i++)
+        {
+            vmemory.memory[ptr + i] = new NullableValue("");
+        }
+        vmemory.emptyArea.Add(new EmptyArea { start = ptr, size = size });
     }
 
 }
