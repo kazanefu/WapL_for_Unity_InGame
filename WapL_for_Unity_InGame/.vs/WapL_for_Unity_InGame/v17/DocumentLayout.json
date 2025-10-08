@@ -7,10 +7,6 @@
       "RelativeMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|solutionrelative:assets\\resouces\\waplinterpreter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpretert.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\Resouces\\WapLInterpretert.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\assets\\resouces\\readandcall.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3B572105-A696-58A8-E4BB-22B806B3CF40}|Assembly-CSharp.csproj|solutionrelative:assets\\resouces\\readandcall.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -40,7 +36,7 @@
               "RelativeDocumentMoniker": "Assets\\Resouces\\WapLInterpreter.cs",
               "ToolTip": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpreter.cs",
               "RelativeToolTip": "Assets\\Resouces\\WapLInterpreter.cs",
-              "ViewState": "AgIAAL4BAAAAjGZmZiYgwMcBAABEAAAAAAAAAA==",
+              "ViewState": "AgIAAEABAAAAAAAAAAAAAFIBAAA7AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-05T11:19:17.654Z",
               "EditorCaption": ""
@@ -48,17 +44,6 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "WapLInterpretert.cs",
-              "DocumentMoniker": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpretert.cs",
-              "RelativeDocumentMoniker": "Assets\\Resouces\\WapLInterpretert.cs",
-              "ToolTip": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\WapLInterpretert.cs",
-              "RelativeToolTip": "Assets\\Resouces\\WapLInterpretert.cs",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-10-05T11:11:40.792Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
               "Title": "ReadandCall.cs",
               "DocumentMoniker": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\ReadandCall.cs",
               "RelativeDocumentMoniker": "Assets\\Resouces\\ReadandCall.cs",
@@ -70,7 +55,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "IsExternalInit.cs",
               "DocumentMoniker": "C:\\Users\\hayate\\UnityProjects\\WapL_for_InGameInterpreter\\WapL_for_Unity_InGame\\Assets\\Resouces\\IsExternalInit.cs",
               "RelativeDocumentMoniker": "Assets\\Resouces\\IsExternalInit.cs",

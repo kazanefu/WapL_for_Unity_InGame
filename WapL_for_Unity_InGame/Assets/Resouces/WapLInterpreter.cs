@@ -332,6 +332,13 @@ public class WapLInterpreter : MonoBehaviour
         if (exprInput.StartsWith("\"") && exprInput.EndsWith("\"")) return new StringValue(exprInput.Substring(1, exprInput.Length - 2));
         if (double.TryParse(exprInput, out double n)) return new F64Value(n);
         if (exprInput == "true") { return new BoolValue(true); }else if(exprInput == "false") { return new BoolValue(false); }
+        if (exprInput.StartsWith("keyboard_")) {
+            string keyName = exprInput.Substring("keyboard_".Length); 
+            if (System.Enum.TryParse(keyName, true, out KeyCode keyCode))
+            {
+                return new BoolValue(Input.GetKey(keyCode));
+            }
+        }
         if ((scope != null && scope.ContainsKey(exprInput))) { scope[exprInput].Value = vmemory.memory[scope[exprInput].ptr]; return scope[exprInput].Value; }
         if (variables.ContainsKey(exprInput)) { variables[exprInput].Value = vmemory.memory[variables[exprInput].ptr]; return variables[exprInput].Value; }
 
