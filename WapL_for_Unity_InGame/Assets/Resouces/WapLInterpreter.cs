@@ -20,6 +20,7 @@ record NullableValue(string Data) : VariableValue;
 record PointerValue(int Data): VariableValue;
 record VecValue(VecPtrAndSize Data) : VariableValue;
 record VecElements(List<VariableValue> Data):VariableValue;
+record GameObjectValue(GameObject Data):VariableValue;
 
 class VecPtrAndSize { public int ptr;public int len; }
 class EmptyArea
@@ -59,6 +60,7 @@ public class WapLInterpreter : MonoBehaviour
     public string input;
     public Text outputfield;
     public string output;
+    public GameObject Me;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -317,7 +319,7 @@ public class WapLInterpreter : MonoBehaviour
                 VariableValue ret = EvaluateExpression(retExpr, scope);
                 foreach (var j in scope)
                 {
-                    if (!j.Key.StartsWith("ref_")) { free(j.Value.ptr, 1); }
+                    if (!j.Key.StartsWith("&_")) { free(j.Value.ptr, 1); }
                 }
                 return ret; // Å© Ç±Ç±Ç≈ílÇï‘Ç∑
             }
@@ -339,6 +341,7 @@ public class WapLInterpreter : MonoBehaviour
                 return new BoolValue(Input.GetKey(keyCode));
             }
         }
+        if(exprInput == "ME") { return new GameObjectValue(Me); }
         if ((scope != null && scope.ContainsKey(exprInput))) { scope[exprInput].Value = vmemory.memory[scope[exprInput].ptr]; return scope[exprInput].Value; }
         if (variables.ContainsKey(exprInput)) { variables[exprInput].Value = vmemory.memory[variables[exprInput].ptr]; return variables[exprInput].Value; }
 
@@ -459,8 +462,8 @@ public class WapLInterpreter : MonoBehaviour
                 case "alias":
                     int a_ptr = (int)VariableToDouble(evalpart[1]);
                     string a_type = "String";
-                    string a_name = parts[0].Trim();  // parts[0]
-                    VariableValue a_value = evalpart[1]; // parts[1]
+                    string a_name = parts[0].Trim();
+                    VariableValue a_value = evalpart[1];
                     SetVariableWithPtr(a_ptr, a_name, a_type, vmemory.memory[a_ptr], scope);
                     return a_value;
                 case "val": return vmemory.memory[(int)VariableToDouble(evalpart[0])];
@@ -497,7 +500,7 @@ public class WapLInterpreter : MonoBehaviour
                             SetVariable(parts[0].Trim(), "vec", new VecElements(push_contents));
                             return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 });
                     }
-                    return new NullableValue("you can't push because not vec");
+                    return new NullableValue("you can't push because it is not vec");
                 case "free":
                     switch (evalpart[0])
                     {
@@ -506,6 +509,99 @@ public class WapLInterpreter : MonoBehaviour
                     if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr,1); return new PointerValue(scope[parts[0].Trim()].ptr); }
                     else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new PointerValue(variables[parts[0].Trim()].ptr); }
                     else { return new NullableValue("not variable"); }
+                case "clear_output":output = "";return new StringValue(output);
+                case "find_object":
+                    GameObject gob = GameObject.Find(VariableToString(evalpart[0]));
+                    return new GameObjectValue(gob);
+                case "find_object_tag":
+                    GameObject[] gobs = GameObject.FindGameObjectsWithTag(VariableToString(evalpart[0]));
+                    List<VariableValue> gobse = new List<VariableValue>(gobs.Length);
+                    foreach (GameObject i in gobs)
+                    {
+                        gobse.Add(new GameObjectValue(i));
+                    }
+                    return new VecElements(gobse);
+                case "get_position":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):return new Vec3Value(go.transform.position);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_rotation":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.rotation.eulerAngles);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_scale":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.localScale);
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_position":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.position = v3;
+                                    return evalpart[1];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_rotation":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.rotation = Quaternion.Euler(v3);
+                                    return evalpart[1];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_scale":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.localScale = v3;
+                                    return evalpart[1];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_forward":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.forward);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_up":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.up);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_right":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.right);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_name":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new StringValue(go.name);
+                    }
+                    return new NullableValue("not GameObject");
 
 
 
@@ -519,7 +615,7 @@ public class WapLInterpreter : MonoBehaviour
                 for (int j = 0; j < func.Parameters.Count; j++)
                 {
                     VariableValue val = EvaluateExpression(parts[j].Trim(), scope);
-                    if (func.Parameters[j].Name.StartsWith("ref_"))
+                    if (func.Parameters[j].Name.StartsWith("&_"))
                     {
                         int ptr = (int)VariableToDouble(val);
                         SetVariableWithPtr(ptr, func.Parameters[j].Name, func.Parameters[j].Type, vmemory.memory[ptr], localVars);
@@ -661,6 +757,7 @@ public class WapLInterpreter : MonoBehaviour
         Vector3 v3_val = Vector3.zero;
         VecPtrAndSize vps_val = new VecPtrAndSize { ptr = 0, len = 0 };
         bool is_NaV = true;
+        if(type == "String") { value = To_String(value); }
         switch (value)
         {
             case F64Value(var d):val = d;break;
@@ -673,6 +770,7 @@ public class WapLInterpreter : MonoBehaviour
             case PointerValue(var p):val = p;break;
             case VecElements(var ve):break;
             case VecValue(var vv):vps_val = vv;is_NaV = false; break;
+            case GameObjectValue(var gob):break;
         }
         switch (type)
         {
@@ -685,6 +783,7 @@ public class WapLInterpreter : MonoBehaviour
             case "vec3": return new Vec3Value(v3_val);
             case "ptr": return new PointerValue((int)val);
             case "vec":if (!is_NaV) { return new VecValue(vps_val); } else { return value; }
+            case "gob":return value;
             default: return value;
         }
     }
@@ -736,7 +835,7 @@ public class WapLInterpreter : MonoBehaviour
             case StringValue(var s): s_val = s; break;
             case BoolValue(var b): s_val = b.ToString(); break;
             case PointerValue(var p): s_val = p.ToString();break;
-            case NullableValue(var n): s_val = "Null";break;
+            case NullableValue(var n):if (n == "") { s_val = "Null"; } else { s_val = n; } break;
         }
         return new StringValue(s_val);
     }
