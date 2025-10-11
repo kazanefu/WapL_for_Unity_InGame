@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Unity.VisualScripting;
@@ -52,12 +53,11 @@ class Function
 
 public class WapLInterpreter : MonoBehaviour
 {
+    Dictionary<string, Stopwatch> timers = new Dictionary<string, Stopwatch>();
     Dictionary<string, Variable> variables = new Dictionary<string, Variable>();
-    Dictionary<string, Variable> saved_variables = new Dictionary<string, Variable>();
     Dictionary<string, Function> functions = new Dictionary<string, Function>();
     Dictionary<string, int> labelPositions = new Dictionary<string, int>();
     Memory vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
-    Memory saved_vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
     public InputField inputfield;
     public string input;
     public Text outputfield;
@@ -91,6 +91,7 @@ public class WapLInterpreter : MonoBehaviour
     void flash()
     {
         first_call = true;
+        timers = new Dictionary<string, Stopwatch>();
         functions = new Dictionary<string, Function>();
         variables = new Dictionary<string, Variable>();
         labelPositions = new Dictionary<string, int>();
@@ -105,17 +106,7 @@ public class WapLInterpreter : MonoBehaviour
 
     public float RunCode()
     {
-        //functions = new Dictionary<string, Function>();
-        //variables = new Dictionary<string, Variable>();
-        //labelPositions = new Dictionary<string, int>();
-        //vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
-        //for (int i = 0;i < 10000; i++)
-        //{
-        //    vmemory.memory[i] = new NullableValue("");
-        //}
-        //vmemory.emptyArea.Add(new EmptyArea { start = 0, size = 10000 });
         float used_energy = 0.0f;
-        //string[] commands = input.Split(';');
 
         // ラベル位置のスキャン
         for (int i = 0; i < commands.Length; i++)
@@ -249,37 +240,11 @@ public class WapLInterpreter : MonoBehaviour
 
     VariableValue EvaluateCommand(string line, Dictionary<string, Variable>? localScope = null)
     {
-        //if (line.Contains("(") && line.EndsWith(")"))
-        //{
-        //    string funcName = line.Substring(0, line.IndexOf('(')).Trim();
-        //    string argsPart = line.Substring(line.IndexOf('(') + 1);
-        //    argsPart = argsPart.Substring(0, argsPart.Length - 1);
-        //    string[] arguments = SplitArgs(argsPart);
-
-        //    if (functions.ContainsKey(funcName))
-        //    {
-        //        var func = functions[funcName];
-        //        var localVars = new Dictionary<string, Variable>();
-        //        for (int j = 0; j < func.Parameters.Count; j++)
-        //        {
-        //            VariableValue val = EvaluateExpression(arguments[j].Trim(), localScope);
-        //            string type = func.Parameters[j].Type;
-        //            localVars[func.Parameters[j].Name] = new Variable { Type = type, Value = val };
-        //        }
-
-        //        VariableValue result = ExecuteFunctionBody(func.Body, localVars);
-        //        //return result;
-        //    }
-        //    else
-        //    {
-        //        //EvaluateExpression(line, localScope);
-        //    }
-        //}
         return EvaluateExpression(line, localScope);
     }
     VariableValue ExecuteFunctionBody(List<string> body, Dictionary<string, Variable> scope)
     {
-        Debug.Log("Called");
+        UnityEngine.Debug.Log("Called");
         // 関数内だけのラベル表
         var localLabels = new Dictionary<string, int>();
         for (int i = 0; i < body.Count; i++)
@@ -426,6 +391,9 @@ public class WapLInterpreter : MonoBehaviour
                 case "and": return new BoolValue(VariableToBool(evalpart[0]) && VariableToBool(evalpart[1]));
                 case "or": return new BoolValue(VariableToBool(evalpart[0]) || VariableToBool(evalpart[1]));
                 case "not": return new BoolValue(!VariableToBool(evalpart[0]));
+                case "&&": return new BoolValue(VariableToBool(evalpart[0]) && VariableToBool(evalpart[1]));
+                case "||": return new BoolValue(VariableToBool(evalpart[0]) || VariableToBool(evalpart[1]));
+                case "!": return new BoolValue(!VariableToBool(evalpart[0]));
                 case "+=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1]));
                 case "-=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1]));
                 case "*=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1]));
@@ -450,7 +418,7 @@ public class WapLInterpreter : MonoBehaviour
                     for (int i = 0; i <= parts.Length - 1; i++)
                     {
                         //Console.WriteLine(evalpart[i]);
-                        Debug.Log(VariableToString(To_String(evalpart[i])));
+                        UnityEngine.Debug.Log(VariableToString(To_String(evalpart[i])));
                         output += "\n" + VariableToString(To_String(evalpart[i]));
                         outputfield.text = output;
                     }
@@ -473,9 +441,9 @@ public class WapLInterpreter : MonoBehaviour
                     Vec3Value vector_three = new Vec3Value(new Vector3(VariableToFloat(evalpart[0]), VariableToFloat(evalpart[1]), VariableToFloat(evalpart[2])));
                     return vector_three;
                 case "ptr":
-                    Debug.Log("ptr Called");
-                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){ Debug.Log(scope[parts[0].Trim()].ptr); return new PointerValue(scope[parts[0].Trim()].ptr); } 
-                    else if(variables.ContainsKey(parts[0].Trim())) { Debug.Log(variables[parts[0].Trim()].ptr); return new PointerValue(variables[parts[0].Trim()].ptr); }
+                    UnityEngine.Debug.Log("ptr Called");
+                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){ UnityEngine.Debug.Log(scope[parts[0].Trim()].ptr); return new PointerValue(scope[parts[0].Trim()].ptr); } 
+                    else if(variables.ContainsKey(parts[0].Trim())) { UnityEngine.Debug.Log(variables[parts[0].Trim()].ptr); return new PointerValue(variables[parts[0].Trim()].ptr); }
                     else { return new NullableValue(""); }
                 case "vec_start":
                     switch (evalpart[0]) { case VecValue(var vv):return new PointerValue(vv.ptr); }return new NullableValue("no ptr");
@@ -623,6 +591,12 @@ public class WapLInterpreter : MonoBehaviour
                         case GameObjectValue(var go): return new StringValue(go.name);
                     }
                     return new NullableValue("not GameObject");
+                case "set_name":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): go.name = VariableToString(evalpart[1]); return new StringValue(go.name);
+                    }
+                    return new NullableValue("not GameObject");
                 case "gen_obj":
                     return GenObject(evalpart[0]);
                 case "set_active":
@@ -639,24 +613,27 @@ public class WapLInterpreter : MonoBehaviour
                     switch (evalpart[0])
                     {
                         case GameObjectValue(var ob):
-                            switch (evalpart[0])
-                            {
-                                case VecValue(var vv): free(vv.ptr, vv.len); break;
-                            }
                             Destroy(ob);
                             break;
-                            //if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr, 1); return new NullableValue("delete game object"); }
-                            //else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new NullableValue("delete game object"); }
-                            //else { return new NullableValue("not variable"); }
                     }
                     return new NullableValue("fail to delete game object");
                 case "is_first":
                     return new BoolValue(first_call);
+                case "set_timer":
+                    timers[VariableToString(evalpart[0])] = new Stopwatch();
+                    timers[VariableToString(evalpart[0])].Restart();
+                    return evalpart[0];
+                case "get_timer":
+                    if (timers.ContainsKey(VariableToString(evalpart[0])))
+                    {
+                        return new F64Value(timers[VariableToString(evalpart[0])].Elapsed.TotalSeconds);
+                    }
+                    return evalpart[0];
             }
 
             if (functions.ContainsKey(op))
             {
-                Debug.Log("find function");
+                UnityEngine.Debug.Log("find function");
                 var func = functions[op];
                 var localVars = new Dictionary<string, Variable>();
                 for (int j = 0; j < func.Parameters.Count; j++)
