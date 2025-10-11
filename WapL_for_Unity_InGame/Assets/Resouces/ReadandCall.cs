@@ -6,6 +6,8 @@ public class ReadandCall : MonoBehaviour
 {
     public GameObject interpreterobj;
     public WapLInterpreter interpreter;
+    public GameObject Ifield;
+    public GameObject Ofield;
     // Start is called before the first frame update
     void Start()
     {
@@ -22,6 +24,16 @@ public class ReadandCall : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F5) && Input.GetKey(KeyCode.D))
         {
             interpreter.RunCode();
+        }
+        if (Input.GetKeyDown(KeyCode.Escape) && Input.GetKey(KeyCode.D))
+        {
+            Ofield.SetActive(false);
+            Ifield.SetActive(false);
+        }
+        if (Input.GetKeyDown(KeyCode.Escape) && Input.GetKey(KeyCode.R))
+        {
+            Ofield.SetActive(true);
+            Ifield.SetActive(true);
         }
     }
 }

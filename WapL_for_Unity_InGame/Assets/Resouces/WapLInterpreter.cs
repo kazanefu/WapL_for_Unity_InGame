@@ -53,14 +53,19 @@ class Function
 public class WapLInterpreter : MonoBehaviour
 {
     Dictionary<string, Variable> variables = new Dictionary<string, Variable>();
+    Dictionary<string, Variable> saved_variables = new Dictionary<string, Variable>();
     Dictionary<string, Function> functions = new Dictionary<string, Function>();
     Dictionary<string, int> labelPositions = new Dictionary<string, int>();
     Memory vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
+    Memory saved_vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
     public InputField inputfield;
     public string input;
     public Text outputfield;
     public string output;
     public GameObject Me;
+    public GameObject cubePrefab;
+    public string[] commands;
+    public bool first_call;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -76,25 +81,41 @@ public class WapLInterpreter : MonoBehaviour
     public void ReadInput()
     {
         input = inputfield.text;
+        flash();
     }
     public void ReadInputFromString(string code)
     {
         input = code;
+        flash();
     }
-
-    public float RunCode()
+    void flash()
     {
+        first_call = true;
         functions = new Dictionary<string, Function>();
         variables = new Dictionary<string, Variable>();
         labelPositions = new Dictionary<string, int>();
         vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
-        for (int i = 0;i < 10000; i++)
+        for (int i = 0; i < 10000; i++)
         {
             vmemory.memory[i] = new NullableValue("");
         }
         vmemory.emptyArea.Add(new EmptyArea { start = 0, size = 10000 });
+        commands = input.Split(';');
+    }
+
+    public float RunCode()
+    {
+        //functions = new Dictionary<string, Function>();
+        //variables = new Dictionary<string, Variable>();
+        //labelPositions = new Dictionary<string, int>();
+        //vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
+        //for (int i = 0;i < 10000; i++)
+        //{
+        //    vmemory.memory[i] = new NullableValue("");
+        //}
+        //vmemory.emptyArea.Add(new EmptyArea { start = 0, size = 10000 });
         float used_energy = 0.0f;
-        string[] commands = input.Split(';');
+        //string[] commands = input.Split(';');
 
         // ラベル位置のスキャン
         for (int i = 0; i < commands.Length; i++)
@@ -221,39 +242,39 @@ public class WapLInterpreter : MonoBehaviour
         }
 
 
-
+        first_call = false;
         return used_energy;
 
     }
 
     VariableValue EvaluateCommand(string line, Dictionary<string, Variable>? localScope = null)
     {
-        if (line.Contains("(") && line.EndsWith(")"))
-        {
-            string funcName = line.Substring(0, line.IndexOf('(')).Trim();
-            string argsPart = line.Substring(line.IndexOf('(') + 1);
-            argsPart = argsPart.Substring(0, argsPart.Length - 1);
-            string[] arguments = SplitArgs(argsPart);
+        //if (line.Contains("(") && line.EndsWith(")"))
+        //{
+        //    string funcName = line.Substring(0, line.IndexOf('(')).Trim();
+        //    string argsPart = line.Substring(line.IndexOf('(') + 1);
+        //    argsPart = argsPart.Substring(0, argsPart.Length - 1);
+        //    string[] arguments = SplitArgs(argsPart);
 
-            if (functions.ContainsKey(funcName))
-            {
-                var func = functions[funcName];
-                var localVars = new Dictionary<string, Variable>();
-                for (int j = 0; j < func.Parameters.Count; j++)
-                {
-                    VariableValue val = EvaluateExpression(arguments[j].Trim(), localScope);
-                    string type = func.Parameters[j].Type;
-                    localVars[func.Parameters[j].Name] = new Variable { Type = type, Value = val };
-                }
+        //    if (functions.ContainsKey(funcName))
+        //    {
+        //        var func = functions[funcName];
+        //        var localVars = new Dictionary<string, Variable>();
+        //        for (int j = 0; j < func.Parameters.Count; j++)
+        //        {
+        //            VariableValue val = EvaluateExpression(arguments[j].Trim(), localScope);
+        //            string type = func.Parameters[j].Type;
+        //            localVars[func.Parameters[j].Name] = new Variable { Type = type, Value = val };
+        //        }
 
-                VariableValue result = ExecuteFunctionBody(func.Body, localVars);
-                //return result;
-            }
-            else
-            {
-                //EvaluateExpression(line, localScope);
-            }
-        }
+        //        VariableValue result = ExecuteFunctionBody(func.Body, localVars);
+        //        //return result;
+        //    }
+        //    else
+        //    {
+        //        //EvaluateExpression(line, localScope);
+        //    }
+        //}
         return EvaluateExpression(line, localScope);
     }
     VariableValue ExecuteFunctionBody(List<string> body, Dictionary<string, Variable> scope)
@@ -509,7 +530,7 @@ public class WapLInterpreter : MonoBehaviour
                     if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr,1); return new PointerValue(scope[parts[0].Trim()].ptr); }
                     else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new PointerValue(variables[parts[0].Trim()].ptr); }
                     else { return new NullableValue("not variable"); }
-                case "clear_output":output = "";return new StringValue(output);
+                case "clear_output":output = ""; outputfield.text = output; return new StringValue(output);
                 case "find_object":
                     GameObject gob = GameObject.Find(VariableToString(evalpart[0]));
                     return new GameObjectValue(gob);
@@ -602,9 +623,35 @@ public class WapLInterpreter : MonoBehaviour
                         case GameObjectValue(var go): return new StringValue(go.name);
                     }
                     return new NullableValue("not GameObject");
-
-
-
+                case "gen_obj":
+                    return GenObject(evalpart[0]);
+                case "set_active":
+                    return ActiveGameObject(evalpart[0], evalpart[1]);
+                case "get_active":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new BoolValue(go.activeSelf);
+                    }
+                    return new NullableValue("not GameObject");
+                case "type":
+                    return new StringValue(TypeReturn(evalpart[0]));
+                case "del":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var ob):
+                            switch (evalpart[0])
+                            {
+                                case VecValue(var vv): free(vv.ptr, vv.len); break;
+                            }
+                            Destroy(ob);
+                            break;
+                            //if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr, 1); return new NullableValue("delete game object"); }
+                            //else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new NullableValue("delete game object"); }
+                            //else { return new NullableValue("not variable"); }
+                    }
+                    return new NullableValue("fail to delete game object");
+                case "is_first":
+                    return new BoolValue(first_call);
             }
 
             if (functions.ContainsKey(op))
@@ -789,7 +836,7 @@ public class WapLInterpreter : MonoBehaviour
     }
     string TypeReturn(VariableValue value)
     {
-        string ret = "i32";
+        string ret = "null";
         switch (value)
         {
             case I32Value(var i): ret = "i32"; break;
@@ -802,6 +849,7 @@ public class WapLInterpreter : MonoBehaviour
             case PointerValue(var p): ret = "ptr"; break;
             case VecValue(var v): ret = "vec";break;
             case VecElements(var ve):ret = "vece";break;
+            case GameObjectValue(var ob): ret = "gob";break;
         }
         return ret;
     }
@@ -883,5 +931,37 @@ public class WapLInterpreter : MonoBehaviour
         }
         vmemory.emptyArea = NewEmpty;
     }
+    VariableValue GenObject(VariableValue shape)
+    {
+        switch (shape)
+        {
+            case StringValue(var s):
+                switch (s)
+                {
+                    case "cube":
+                        GameObject cube = Instantiate<GameObject>(cubePrefab,new Vector3(0f,0f,0f),Quaternion.identity);
+                        return new GameObjectValue(cube);
+                }
+                break;
+        }
+        return new NullableValue("fail to generate GameObject");
+    }
+    VariableValue ActiveGameObject(VariableValue ob,VariableValue active)
+    {
+        switch (ob)
+        {
+
+            case GameObjectValue(var obj):
+                switch (active) 
+                {
+                    case BoolValue(var b):
+                        obj.SetActive(b);
+                        break;
+                }
+                break;
+        }
+        return new NullableValue("set active");
+    }
+    
 
 }

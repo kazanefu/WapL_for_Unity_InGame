@@ -1547,6 +1547,8 @@ MonoBehaviour:
   input: 
   outputfield: {fileID: 6760739334129469365}
   output: 
+  Me: {fileID: 6935466645024693228}
+  cubePrefab: {fileID: 6810499306894396591, guid: 10260f34dbc10be4885030146617988c, type: 3}
 --- !u!114 &7397184776884656569
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1561,6 +1563,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   interpreterobj: {fileID: 6935466645024693228}
   interpreter: {fileID: 4795963336110263665}
+  Ifield: {fileID: 8087322658088494125}
+  Ofield: {fileID: 8508197841180670921}
 --- !u!1 &7478746762693373308
 GameObject:
   m_ObjectHideFlags: 0
