@@ -23,7 +23,7 @@ record VecValue(VecPtrAndSize Data) : VariableValue;
 record VecElements(List<VariableValue> Data):VariableValue;
 record GameObjectValue(GameObject Data):VariableValue;
 
-class VecPtrAndSize { public int ptr;public int len; }
+class VecPtrAndSize { public int ptr;public int len;public int capacity; }
 class EmptyArea
 {
     public int start;
@@ -347,7 +347,32 @@ public class WapLInterpreter : MonoBehaviour
                 }
             }
 
-            if (variables.ContainsKey(op) && variables[op].Type == "vec3")
+            if (scope != null&&scope.ContainsKey(op) && scope[op].Type == "vec3")
+            {
+                VariableValue exprInputV3 = scope[op].Value;
+                Vector3 parts3 = new Vector3(0f, 0f, 0f);
+                switch (exprInputV3)
+                {
+                    case Vec3Value(var v): parts3 = v; break;
+                }
+                //int lparenV3 = exprInputV3.IndexOf('(');
+                //string opV3 = exprInputV3.Substring(0, lparenV3);
+                //string insideV3 = exprInput.Substring(lparenV3 + 1, exprInputV3.Length - lparenV3 - 2);
+                //string[] partsV3 = SplitArgs(insideV3);
+                if (parts[0] == "x")
+                {
+                    return new F32Value(parts3.x);
+                }
+                else if (parts[0] == "y")
+                {
+                    return new F32Value(parts3.y);
+                }
+                else if (parts[0] == "z")
+                {
+                    return new F32Value(parts3.z);
+                }
+            }
+            else if (variables.ContainsKey(op) && variables[op].Type == "vec3")
             {
                 VariableValue exprInputV3 = variables[op].Value;
                 Vector3 parts3 = new Vector3(0f,0f,0f);
@@ -456,7 +481,7 @@ public class WapLInterpreter : MonoBehaviour
                     SetVariableWithPtr(a_ptr, a_name, a_type, vmemory.memory[a_ptr], scope);
                     return a_value;
                 case "val": return vmemory.memory[(int)VariableToDouble(evalpart[0])];
-                case "vec": List<VariableValue> ret = new List<VariableValue>();for (int i = 0;i < evalpart.Count;i++) { ret.Add(evalpart[i]); } return new VecElements(ret);
+                case "vec": List<VariableValue> ret = new List<VariableValue>();for (int i = 0;i < evalpart.Count;i++) { if (evalpart.Count == 1&& parts[0].Trim() == "") { } else { ret.Add(evalpart[i]); } } return new VecElements(ret);
                 case "expand":
                     List<VariableValue> contents = new List<VariableValue>();
                     switch (evalpart[0])
@@ -484,16 +509,25 @@ public class WapLInterpreter : MonoBehaviour
                             {
                                 push_contents.Add(vmemory.memory[vv.ptr + i]);
                             }
-                            push_contents.Add(evalpart[1]);
-                            free(vv.ptr, vv.len);
-                            SetVariable(parts[0].Trim(), "vec", new VecElements(push_contents));
-                            return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 });
+                            if(vv.len + 1 > vv.capacity)
+                            {
+                                push_contents.Add(evalpart[1]);
+                                free(vv.ptr, vv.len);
+                                SetVariable(parts[0].Trim(), "vec", new VecElements(push_contents));
+                                return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 ,capacity = vv.len + 1 });
+                            }
+                            else
+                            {
+                                vmemory.memory[vv.ptr + vv.len] = evalpart[1];
+                                return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 ,capacity = vv.capacity});
+                            }
+                            
                     }
                     return new NullableValue("you can't push because it is not vec");
                 case "free":
                     switch (evalpart[0])
                     {
-                        case VecValue(var vv):free(vv.ptr, vv.len);break;
+                        case VecValue(var vv):free(vv.ptr, vv.capacity);break;
                     }
                     if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr,1); return new PointerValue(scope[parts[0].Trim()].ptr); }
                     else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new PointerValue(variables[parts[0].Trim()].ptr); }
@@ -609,14 +643,14 @@ public class WapLInterpreter : MonoBehaviour
                     return new NullableValue("not GameObject");
                 case "type":
                     return new StringValue(TypeReturn(evalpart[0]));
-                case "del":
+                case "destroy":
                     switch (evalpart[0])
                     {
                         case GameObjectValue(var ob):
                             Destroy(ob);
                             break;
                     }
-                    return new NullableValue("fail to delete game object");
+                    return new NullableValue("fail to destroy game object");
                 case "is_first":
                     return new BoolValue(first_call);
                 case "set_timer":
@@ -677,10 +711,20 @@ public class WapLInterpreter : MonoBehaviour
 
     void SetVariable(string name, string type, VariableValue value, Dictionary<string, Variable>? scope = null)
     {
-
+        if (type.StartsWith("gbl_"))
+        {
+            scope = null;
+            type = type.Substring(4);
+        }
+        int capa = 0;
+        if (type.StartsWith("vec_"))
+        {
+            if(int.TryParse(type.Substring(4).Trim(),out int i)) { capa = i; }
+            type = "vec";
+        }
         VariableValue value_new = TypeAjust(type,value);
         int size = 1;
-        if(type == "vec")
+        if(type=="vec")
         {
             switch (TypeReturn(value_new))
             {
@@ -689,12 +733,13 @@ public class WapLInterpreter : MonoBehaviour
                     switch (value_new) { 
                         case VecElements(var ve):
                             size = ve.Count();
-                            int ptr = alloc(size);
+                            int size_capa = (size > capa) ? size : capa;
+                            int ptr = alloc(size_capa);
                             for(int i = 0;i<size;i++)
                             {
                                 vmemory.memory[ptr + i] = ve[i];
                             }
-                            value_new = new VecValue(new VecPtrAndSize { ptr = ptr, len = size });
+                            value_new = new VecValue(new VecPtrAndSize { ptr = ptr, len = size, capacity = size_capa});
                             size = 1;
                             break;
                     }
@@ -779,7 +824,7 @@ public class WapLInterpreter : MonoBehaviour
         string s_val = "";
         bool b_val = false;
         Vector3 v3_val = Vector3.zero;
-        VecPtrAndSize vps_val = new VecPtrAndSize { ptr = 0, len = 0 };
+        VecPtrAndSize vps_val = new VecPtrAndSize { ptr = 0, len = 0 ,capacity = 0};
         bool is_NaV = true;
         if(type == "String") { value = To_String(value); }
         switch (value)
@@ -860,6 +905,7 @@ public class WapLInterpreter : MonoBehaviour
             case StringValue(var s): s_val = s; break;
             case BoolValue(var b): s_val = b.ToString(); break;
             case PointerValue(var p): s_val = p.ToString();break;
+            case GameObjectValue(var ob):s_val = ob.name;break;
             case NullableValue(var n):if (n == "") { s_val = "Null"; } else { s_val = n; } break;
         }
         return new StringValue(s_val);
