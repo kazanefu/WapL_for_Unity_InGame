@@ -64,6 +64,7 @@ public class WapLInterpreter : MonoBehaviour
     public string output;
     public GameObject Me;
     public GameObject cubePrefab;
+    public GameObject spherePrefab;
     public string[] commands;
     public bool first_call;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -107,6 +108,7 @@ public class WapLInterpreter : MonoBehaviour
     public float RunCode()
     {
         float used_energy = 0.0f;
+        Dictionary<string, int> labelLimit = new Dictionary<string, int>();
 
         // ラベル位置のスキャン
         for (int i = 0; i < commands.Length; i++)
@@ -116,6 +118,7 @@ public class WapLInterpreter : MonoBehaviour
             {
                 string labelName = line.Substring(6).Trim();
                 labelPositions[labelName] = i;
+                labelLimit[labelName] = 0;
             }
         }
         //関数のスキャン
@@ -196,7 +199,14 @@ public class WapLInterpreter : MonoBehaviour
                 string labelName = trimmed.Substring(7, trimmed.Length - 8).Trim();
                 if (labelPositions.ContainsKey(labelName))
                 {
+                    if (labelLimit[labelName] >= 10000)
+                    {
+                        output += "\n無限ループの可能性があります: " + labelName;
+                        outputfield.text = output;
+                        continue;
+                    }
                     i = labelPositions[labelName];
+                    labelLimit[labelName] += 1;
                     continue;
                 }
                 else
@@ -223,7 +233,14 @@ public class WapLInterpreter : MonoBehaviour
                     string label = parts[1].Trim();
                     if (conditionResult == true && labelPositions.ContainsKey(label))
                     {
+                        if (labelLimit[label] >= 10000)
+                        {
+                            output += "\n無限ループの可能性があります: " + label;
+                            outputfield.text = output;
+                            continue;
+                        }
                         i = labelPositions[label];
+                        labelLimit[label] += 1;
                         continue;
                     }
                 }
@@ -238,15 +255,16 @@ public class WapLInterpreter : MonoBehaviour
 
     }
 
+#nullable enable
     VariableValue EvaluateCommand(string line, Dictionary<string, Variable>? localScope = null)
     {
         return EvaluateExpression(line, localScope);
     }
     VariableValue ExecuteFunctionBody(List<string> body, Dictionary<string, Variable> scope)
     {
-        UnityEngine.Debug.Log("Called");
         // 関数内だけのラベル表
         var localLabels = new Dictionary<string, int>();
+        var localLabellimits = new Dictionary<string, int>();
         for (int i = 0; i < body.Count; i++)
         {
             string line = body[i].Trim();
@@ -254,6 +272,7 @@ public class WapLInterpreter : MonoBehaviour
             {
                 string labelName = line.Substring(6).Trim();
                 localLabels[labelName] = i;
+                localLabellimits[labelName] = 0;
             }
         }
 
@@ -267,7 +286,14 @@ public class WapLInterpreter : MonoBehaviour
                 string labelName = line.Substring(7, line.Length - 8).Trim();
                 if (localLabels.ContainsKey(labelName))
                 {
+                    if (localLabellimits[labelName] >= 10000)
+                    {
+                        output += "\n無限ループの可能性があります: " + labelName;
+                        outputfield.text = output;
+                        continue;
+                    }
                     i = localLabels[labelName];
+                    localLabellimits[labelName] += 1;
                     continue;
                 }
                 else
@@ -292,6 +318,12 @@ public class WapLInterpreter : MonoBehaviour
                     string label = parts[1].Trim();
                     if (condition == true && localLabels.ContainsKey(label))
                     {
+                        if (localLabellimits[label] >= 10000)
+                        {
+                            output += "\n無限ループの可能性があります: " + label;
+                            outputfield.text = output;
+                            continue;
+                        }
                         i = localLabels[label];
                         continue;
                     }
@@ -401,7 +433,7 @@ public class WapLInterpreter : MonoBehaviour
             switch (op)
             {
                 case "+": return TypeAjust(TypeReturn(evalpart[0]),new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])));
-                //case "t+": return (evalpart[0] + evalpart[1]).ToString();
+                case "t+": return new StringValue(VariableToString(To_String(evalpart[0])) + VariableToString(To_String(evalpart[1])));
                 case "-": return TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])));
                 case "*": return TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])));
                 //case "t*": string textadd = ""; for (int i = 1; i <= int.Parse(evalpart[1]); i++) { textadd += evalpart[0]; } return textadd;
@@ -466,10 +498,9 @@ public class WapLInterpreter : MonoBehaviour
                     Vec3Value vector_three = new Vec3Value(new Vector3(VariableToFloat(evalpart[0]), VariableToFloat(evalpart[1]), VariableToFloat(evalpart[2])));
                     return vector_three;
                 case "ptr":
-                    UnityEngine.Debug.Log("ptr Called");
-                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){ UnityEngine.Debug.Log(scope[parts[0].Trim()].ptr); return new PointerValue(scope[parts[0].Trim()].ptr); } 
-                    else if(variables.ContainsKey(parts[0].Trim())) { UnityEngine.Debug.Log(variables[parts[0].Trim()].ptr); return new PointerValue(variables[parts[0].Trim()].ptr); }
-                    else { return new NullableValue(""); }
+                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){return new PointerValue(scope[parts[0].Trim()].ptr); } 
+                    else if(variables.ContainsKey(parts[0].Trim())) {return new PointerValue(variables[parts[0].Trim()].ptr); }
+                    else { return new NullableValue("not variable"); }
                 case "vec_start":
                     switch (evalpart[0]) { case VecValue(var vv):return new PointerValue(vv.ptr); }return new NullableValue("no ptr");
                 case "to_ptr":return new PointerValue((int)VariableToDouble(evalpart[0]));
@@ -481,6 +512,14 @@ public class WapLInterpreter : MonoBehaviour
                     SetVariableWithPtr(a_ptr, a_name, a_type, vmemory.memory[a_ptr], scope);
                     return a_value;
                 case "val": return vmemory.memory[(int)VariableToDouble(evalpart[0])];
+                case "chars":
+                    char[] chars = VariableToString(evalpart[0]).ToCharArray();
+                    List<VariableValue> charcontents = new List<VariableValue>();
+                    foreach(char Char in chars)
+                    {
+                        charcontents.Add(new StringValue(Char.ToString()));
+                    }
+                    return new VecElements(charcontents);
                 case "vec": List<VariableValue> ret = new List<VariableValue>();for (int i = 0;i < evalpart.Count;i++) { if (evalpart.Count == 1&& parts[0].Trim() == "") { } else { ret.Add(evalpart[i]); } } return new VecElements(ret);
                 case "expand":
                     List<VariableValue> contents = new List<VariableValue>();
@@ -498,6 +537,13 @@ public class WapLInterpreter : MonoBehaviour
                     vmemory.memory[(int)VariableToDouble(evalpart[0])] = evalpart[1];
                     return evalpart[1];
                 case "as":return TypeAjust(parts[0].Trim(), evalpart[1]);
+                case "get_at": switch (evalpart[0]) { case VecValue(var vv): int start_ptr = vv.ptr;return vmemory.memory[(int)VariableToDouble(evalpart[1]) + start_ptr]; }return new NullableValue("not vec");
+                case "clear":
+                    switch (evalpart[0])
+                    {
+                        case VecValue(var vv):return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = 0, capacity = vv.capacity });
+                    }
+                    return new NullableValue("not vec");
                 case "len":
                     switch (evalpart[0]) { case VecValue(var vv):return new I32Value(vv.len); }return new NullableValue("not vec");
                 case "push":
@@ -667,7 +713,6 @@ public class WapLInterpreter : MonoBehaviour
 
             if (functions.ContainsKey(op))
             {
-                UnityEngine.Debug.Log("find function");
                 var func = functions[op];
                 var localVars = new Dictionary<string, Variable>();
                 for (int j = 0; j < func.Parameters.Count; j++)
@@ -914,15 +959,18 @@ public class WapLInterpreter : MonoBehaviour
     {
         int start = vmemory.emptyArea[0].start;
         int pre_size = vmemory.emptyArea[0].size;
+        int index = 0;
         for(int i = 0; i < vmemory.emptyArea.Count; i++)
         {
             if(vmemory.emptyArea[i].size >= size)
             {
                 start = vmemory.emptyArea[i].start;
                 pre_size = vmemory.emptyArea[i].size;
+                index = i;
+                break;
             }
         }
-        vmemory.emptyArea.RemoveAt(0);
+        vmemory.emptyArea.RemoveAt(index);
         vmemory.emptyArea.Add(new EmptyArea { start = start + size, size = pre_size - size });
 
         return start;
@@ -943,7 +991,7 @@ public class WapLInterpreter : MonoBehaviour
         List<EmptyArea> NewEmpty = new List<EmptyArea>(vmemory.emptyArea.Count);
         foreach(EmptyArea emptyarea in vmemory.emptyArea)
         {
-            if(NewEmpty.Count > 0 && NewEmpty[NewEmpty.Count - 1].end() == emptyarea.start )
+            if(NewEmpty.Count > 0 && NewEmpty[NewEmpty.Count - 1].end() == emptyarea.start - 1 )
             {
                 NewEmpty[NewEmpty.Count - 1].size += emptyarea.size;
             }
@@ -964,6 +1012,9 @@ public class WapLInterpreter : MonoBehaviour
                     case "cube":
                         GameObject cube = Instantiate<GameObject>(cubePrefab,new Vector3(0f,0f,0f),Quaternion.identity);
                         return new GameObjectValue(cube);
+                    case "sphere":
+                        GameObject sphere = Instantiate<GameObject>(spherePrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+                        return new GameObjectValue(sphere);
                 }
                 break;
         }
