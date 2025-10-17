@@ -1,0 +1,1132 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.UI;
+
+
+abstract record VariableValue;
+
+record I32Value(int Data) : VariableValue;
+record F32Value(float Data) : VariableValue;
+record I64Value(long Data) : VariableValue;
+record F64Value(double Data) : VariableValue;
+record StringValue(string Data) : VariableValue;
+record BoolValue(bool Data) : VariableValue;
+record Vec3Value(Vector3 Data) : VariableValue;
+record NullableValue(string Data) : VariableValue;
+record PointerValue(int Data): VariableValue;
+record VecValue(VecPtrAndSize Data) : VariableValue;
+record VecElements(List<VariableValue> Data):VariableValue;
+record GameObjectValue(GameObject Data):VariableValue;
+
+class VecPtrAndSize { public int ptr;public int len;public int capacity; }
+class EmptyArea
+{
+    public int start;
+    public int size;
+    public int end()
+    {
+        return (start + size - 1);
+    }
+}
+class Memory
+{
+    public VariableValue[] memory;
+    public List<EmptyArea> emptyArea;
+}
+class Variable
+{
+    public string Type; // "i32","f32", "String", "bool", "vec3", "gameobject", "component","ptr","list"
+    public int ptr;
+    public VariableValue Value;
+}
+
+class Function
+{
+    public List<(string Type, string Name)> Parameters = new List<(string, string)>();
+    public List<string> Body = new List<string>();
+}
+
+public class WapLInterpreter : MonoBehaviour
+{
+    Dictionary<string, Stopwatch> timers = new Dictionary<string, Stopwatch>();
+    Dictionary<string, Variable> variables = new Dictionary<string, Variable>();
+    Dictionary<string, Function> functions = new Dictionary<string, Function>();
+    Dictionary<string, int> labelPositions = new Dictionary<string, int>();
+    Memory vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
+    public InputField inputfield;
+    public string input;
+    public Text outputfield;
+    public string output;
+    public GameObject Me;
+    public GameObject cubePrefab;
+    public GameObject spherePrefab;
+    public GameObject ColliderCubePrefab;
+    public GameObject ColliderSpherePrefab;
+    public GameObject RigidCubePrefab;
+    public GameObject RigidSpherePrefab;
+    public string[] commands;
+    public bool first_call;
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    void Start()
+    {
+
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+
+    }
+
+    public void ReadInput()
+    {
+        input = inputfield.text;
+        flash();
+    }
+    public void ReadInputFromString(string code)
+    {
+        input = code;
+        flash();
+    }
+    void flash()
+    {
+        first_call = true;
+        timers = new Dictionary<string, Stopwatch>();
+        functions = new Dictionary<string, Function>();
+        variables = new Dictionary<string, Variable>();
+        labelPositions = new Dictionary<string, int>();
+        vmemory = new Memory { memory = new VariableValue[10000], emptyArea = new List<EmptyArea>() };
+        for (int i = 0; i < 10000; i++)
+        {
+            vmemory.memory[i] = new NullableValue("");
+        }
+        vmemory.emptyArea.Add(new EmptyArea { start = 0, size = 10000 });
+        commands = input.Split(';');
+    }
+
+    public float RunCode()
+    {
+        float used_energy = 0.0f;
+        Dictionary<string, int> labelLimit = new Dictionary<string, int>();
+
+        // ラベル位置のスキャン
+        for (int i = 0; i < commands.Length; i++)
+        {
+            string line = commands[i].Trim();
+            if (line.StartsWith("point "))
+            {
+                string labelName = line.Substring(6).Trim();
+                labelPositions[labelName] = i;
+                labelLimit[labelName] = 0;
+            }
+        }
+        //関数のスキャン
+        for (int i = 0; i < commands.Length; i++)
+        {
+            string trimmed = commands[i].Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+            if (trimmed.StartsWith("fn "))
+            {
+                string head = trimmed.Substring(3);
+                int lparen = head.IndexOf('(');
+                int rparen = head.IndexOf(')');
+                string funcName = head.Substring(0, lparen).Trim();
+                string argsPart = head.Substring(lparen + 1, rparen - lparen - 1);
+
+                var parameters = new List<(string, string)>();
+                foreach (var p in argsPart.Split(','))
+                {
+                    var parts = p.Trim().Split(' ');
+                    if (parts.Length == 2)
+                    {
+                        parameters.Add((parts[0], parts[1]));
+                    }
+                }
+
+                List<string> body = new List<string>();
+                i++;
+                while (i < commands.Length && !commands[i].Trim().StartsWith("}"))
+                {
+                    body.Add(commands[i].Trim());
+                    i++;
+                }
+                functions[funcName] = new Function
+                {
+                    Parameters = parameters,
+                    Body = body
+                };
+                continue;
+            }
+        }
+
+        for (int i = 0; i < commands.Length; i++)
+        {
+            string trimmed = commands[i].Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+            if (trimmed.StartsWith("fn "))
+            {
+                string head = trimmed.Substring(3);
+                int lparen = head.IndexOf('(');
+                int rparen = head.IndexOf(')');
+                string funcName = head.Substring(0, lparen).Trim();
+                string argsPart = head.Substring(lparen + 1, rparen - lparen - 1);
+
+                var parameters = new List<(string, string)>();
+                foreach (var p in argsPart.Split(','))
+                {
+                    var parts = p.Trim().Split(' ');
+                    if (parts.Length == 2)
+                    {
+                        parameters.Add((parts[0], parts[1]));
+                    }
+                }
+
+                List<string> body = new List<string>();
+                i++;
+                while (i < commands.Length && !commands[i].Trim().StartsWith("}"))
+                {
+                    body.Add(commands[i].Trim());
+                    i++;
+                }
+                continue;
+            }
+
+            if (trimmed.StartsWith("warpto("))
+            {
+                string labelName = trimmed.Substring(7, trimmed.Length - 8).Trim();
+                if (labelPositions.ContainsKey(labelName))
+                {
+                    if (labelLimit[labelName] >= 10000)
+                    {
+                        output += "\n無限ループの可能性があります: " + labelName;
+                        outputfield.text = output;
+                        continue;
+                    }
+                    i = labelPositions[labelName];
+                    labelLimit[labelName] += 1;
+                    continue;
+                }
+                else
+                {
+                    //Console.WriteLine("ラベルが見つかりません: " + labelName);
+                    output += "\nラベルが見つかりません: " + labelName;
+                    outputfield.text = output;
+                }
+            }
+
+            // warptoif(条件, ラベル名) の処理
+            if (trimmed.StartsWith("warptoif("))
+            {
+                string inner = trimmed.Substring(9, trimmed.Length - 10);
+                string[] parts = SplitArgs(inner);
+                if (parts.Length == 2)
+                {
+                    bool conditionResult = false;
+                    switch (EvaluateExpression(parts[0].Trim()))
+                    {
+                        case BoolValue(var b): conditionResult = b;break;
+                    }
+                    
+                    string label = parts[1].Trim();
+                    if (conditionResult == true && labelPositions.ContainsKey(label))
+                    {
+                        if (labelLimit[label] >= 10000)
+                        {
+                            output += "\n無限ループの可能性があります: " + label;
+                            outputfield.text = output;
+                            continue;
+                        }
+                        i = labelPositions[label];
+                        labelLimit[label] += 1;
+                        continue;
+                    }
+                }
+            }
+
+            EvaluateCommand(trimmed);
+        }
+
+
+        first_call = false;
+        return used_energy;
+
+    }
+
+#nullable enable
+    VariableValue EvaluateCommand(string line, Dictionary<string, Variable>? localScope = null)
+    {
+        return EvaluateExpression(line, localScope);
+    }
+    VariableValue ExecuteFunctionBody(List<string> body, Dictionary<string, Variable> scope)
+    {
+        // 関数内だけのラベル表
+        var localLabels = new Dictionary<string, int>();
+        var localLabellimits = new Dictionary<string, int>();
+        for (int i = 0; i < body.Count; i++)
+        {
+            string line = body[i].Trim();
+            if (line.StartsWith("point "))
+            {
+                string labelName = line.Substring(6).Trim();
+                localLabels[labelName] = i;
+                localLabellimits[labelName] = 0;
+            }
+        }
+
+        for (int i = 0; i < body.Count; i++)
+        {
+            string line = body[i].Trim();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            if (line.StartsWith("warpto("))
+            {
+                string labelName = line.Substring(7, line.Length - 8).Trim();
+                if (localLabels.ContainsKey(labelName))
+                {
+                    if (localLabellimits[labelName] >= 10000)
+                    {
+                        output += "\n無限ループの可能性があります: " + labelName;
+                        outputfield.text = output;
+                        continue;
+                    }
+                    i = localLabels[labelName];
+                    localLabellimits[labelName] += 1;
+                    continue;
+                }
+                else
+                {
+                    //Console.WriteLine("関数内のラベルが見つかりません: " + labelName);
+                    output += "関数内のラベルが見つかりません: " + labelName;
+                    outputfield.text = output;
+                }
+            }
+
+            if (line.StartsWith("warptoif("))
+            {
+                string inner = line.Substring(9, line.Length - 10);
+                string[] parts = SplitArgs(inner);
+                if (parts.Length == 2)
+                {
+                    bool condition = false;
+                    switch(EvaluateExpression(parts[0].Trim(), scope))
+                    {
+                        case BoolValue(var b):condition = b;break;
+                    }
+                    string label = parts[1].Trim();
+                    if (condition == true && localLabels.ContainsKey(label))
+                    {
+                        if (localLabellimits[label] >= 10000)
+                        {
+                            output += "\n無限ループの可能性があります: " + label;
+                            outputfield.text = output;
+                            continue;
+                        }
+                        i = localLabels[label];
+                        continue;
+                    }
+                }
+            }
+
+
+            if (line.StartsWith("return "))
+            {
+                string retExpr = line.Substring(7).Trim();
+                VariableValue ret = EvaluateExpression(retExpr, scope);
+                foreach (var j in scope)
+                {
+                    if (!j.Key.StartsWith("&_")) { free(j.Value.ptr, 1); }
+                }
+                return ret; // ← ここで値を返す
+            }
+
+            EvaluateCommand(line, scope);
+        }
+        return new NullableValue("");
+    }
+    VariableValue EvaluateExpression(string exprInput, Dictionary<string, Variable>? scope = null)
+    {
+        exprInput = exprInput.Trim();
+        if (exprInput.StartsWith("\"") && exprInput.EndsWith("\"")) return new StringValue(exprInput.Substring(1, exprInput.Length - 2));
+        if (double.TryParse(exprInput, out double n)) return new F64Value(n);
+        if (exprInput == "true") { return new BoolValue(true); }else if(exprInput == "false") { return new BoolValue(false); }
+        if (exprInput.StartsWith("keyboard_")) {
+            string keyName = exprInput.Substring("keyboard_".Length); 
+            if (System.Enum.TryParse(keyName, true, out KeyCode keyCode))
+            {
+                return new BoolValue(Input.GetKey(keyCode));
+            }
+        }
+        if(exprInput == "ME") { return new GameObjectValue(Me); }
+        if ((scope != null && scope.ContainsKey(exprInput))) { scope[exprInput].Value = vmemory.memory[scope[exprInput].ptr]; return scope[exprInput].Value; }
+        if (variables.ContainsKey(exprInput)) { variables[exprInput].Value = vmemory.memory[variables[exprInput].ptr]; return variables[exprInput].Value; }
+
+        if (exprInput.Contains("(") && exprInput.EndsWith(")"))
+        {
+            int lparen = exprInput.IndexOf('(');
+            string op = exprInput.Substring(0, lparen);
+            string inside = exprInput.Substring(lparen + 1, exprInput.Length - lparen - 2);
+            string[] parts = SplitArgs(inside);
+
+            List<VariableValue> evalpart = new List<VariableValue>(parts.Length);
+            if (op != "do" && op != "if")
+            {
+                for (int l = 0; l < parts.Length; l++)
+                {
+                    evalpart.Add(parts.Length > l ? EvaluateExpression(parts[l], scope) : new NullableValue(""));
+                }
+            }
+
+            if (scope != null&&scope.ContainsKey(op) && scope[op].Type == "vec3")
+            {
+                VariableValue exprInputV3 = scope[op].Value;
+                Vector3 parts3 = new Vector3(0f, 0f, 0f);
+                switch (exprInputV3)
+                {
+                    case Vec3Value(var v): parts3 = v; break;
+                }
+                //int lparenV3 = exprInputV3.IndexOf('(');
+                //string opV3 = exprInputV3.Substring(0, lparenV3);
+                //string insideV3 = exprInput.Substring(lparenV3 + 1, exprInputV3.Length - lparenV3 - 2);
+                //string[] partsV3 = SplitArgs(insideV3);
+                if (parts[0] == "x")
+                {
+                    return new F32Value(parts3.x);
+                }
+                else if (parts[0] == "y")
+                {
+                    return new F32Value(parts3.y);
+                }
+                else if (parts[0] == "z")
+                {
+                    return new F32Value(parts3.z);
+                }
+            }
+            else if (variables.ContainsKey(op) && variables[op].Type == "vec3")
+            {
+                VariableValue exprInputV3 = variables[op].Value;
+                Vector3 parts3 = new Vector3(0f,0f,0f);
+                switch (exprInputV3)
+                {
+                    case Vec3Value(var v):parts3 = v;break;
+                }
+                //int lparenV3 = exprInputV3.IndexOf('(');
+                //string opV3 = exprInputV3.Substring(0, lparenV3);
+                //string insideV3 = exprInput.Substring(lparenV3 + 1, exprInputV3.Length - lparenV3 - 2);
+                //string[] partsV3 = SplitArgs(insideV3);
+                if (parts[0] == "x")
+                {
+                    return new F32Value(parts3.x);
+                }
+                else if (parts[0] == "y")
+                {
+                    return new F32Value(parts3.y);
+                }
+                else if (parts[0] == "z")
+                {
+                    return new F32Value(parts3.z);
+                }
+            }
+
+            switch (op)
+            {
+                case "+": return TypeAjust(TypeReturn(evalpart[0]),new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])));
+                case "t+": return new StringValue(VariableToString(To_String(evalpart[0])) + VariableToString(To_String(evalpart[1])));
+                case "-": return TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])));
+                case "*": return TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])));
+                //case "t*": string textadd = ""; for (int i = 1; i <= int.Parse(evalpart[1]); i++) { textadd += evalpart[0]; } return textadd;
+                case "/": return VariableToDouble(evalpart[1]) != 0 ? TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) / VariableToDouble(evalpart[1]))) : TypeAjust(TypeReturn(evalpart[0]),new F64Value(0));
+                case "%": return VariableToDouble(evalpart[1]) != 0 ? TypeAjust(TypeReturn(evalpart[0]), new F64Value(VariableToDouble(evalpart[0]) % VariableToDouble(evalpart[1]))) : TypeAjust(TypeReturn(evalpart[0]), new F64Value(0));
+                case "==": return new BoolValue(evalpart[0] == evalpart[1]);
+                case "!=": return new BoolValue(!(evalpart[0] == evalpart[1]));
+                case ">": return new BoolValue(VariableToDouble(evalpart[0]) > VariableToDouble(evalpart[1]));
+                case "<": return new BoolValue(VariableToDouble(evalpart[0]) < VariableToDouble(evalpart[1]));
+                case ">=": return new BoolValue(VariableToDouble(evalpart[0]) >= VariableToDouble(evalpart[1]));
+                case "<=": return new BoolValue(VariableToDouble(evalpart[0]) <= VariableToDouble(evalpart[1]));
+                case "and": return new BoolValue(VariableToBool(evalpart[0]) && VariableToBool(evalpart[1]));
+                case "or": return new BoolValue(VariableToBool(evalpart[0]) || VariableToBool(evalpart[1]));
+                case "not": return new BoolValue(!VariableToBool(evalpart[0]));
+                case "&&": return new BoolValue(VariableToBool(evalpart[0]) && VariableToBool(evalpart[1]));
+                case "||": return new BoolValue(VariableToBool(evalpart[0]) || VariableToBool(evalpart[1]));
+                case "!": return new BoolValue(!VariableToBool(evalpart[0]));
+                case "+=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) + VariableToDouble(evalpart[1]));
+                case "-=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) - VariableToDouble(evalpart[1]));
+                case "*=": if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) * VariableToDouble(evalpart[1]));
+                case "/=": if (VariableToDouble(evalpart[1]) != 0) { if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) / VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) / VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) / VariableToDouble(evalpart[1])); } return new F64Value(0);
+                case "%=": if (VariableToDouble(evalpart[1]) != 0) { if ((scope != null && scope.ContainsKey(parts[0]))) { SetVariable(parts[0], scope[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) % VariableToDouble(evalpart[1])), scope); } else if (variables.ContainsKey(parts[0])) { SetVariable(parts[0], variables[parts[0]].Type, new F64Value(VariableToDouble(evalpart[0]) % VariableToDouble(evalpart[1])), null); } return new F64Value(VariableToDouble(evalpart[0]) % VariableToDouble(evalpart[1])); } return new F64Value(0);
+                case "=":
+                    string type = "String";
+                    if (parts.Length < 3) { type = TypeReturn(evalpart[0]); } else { type = VariableToString(evalpart[2]); }
+                    string name = parts[0].Trim();  // parts[0]
+                    VariableValue value = evalpart[1]; // parts[1]
+                    SetVariable(name, type, value, scope);
+                    return value;
+                    
+                case "input":
+                    //ゲーム内でコンソールの入力は受けないので廃止
+                    //string input_name = evalpart[0];
+                    //Console.Write($"入力 [{input_name}]: ");
+                    //string input_value = Console.ReadLine() ?? "";
+                    //return input_value;
+                    return new StringValue(exprInput.Trim());
+                case "print":
+                    for (int i = 0; i <= parts.Length - 1; i++)
+                    {
+                        //Console.WriteLine(evalpart[i]);
+                        UnityEngine.Debug.Log(VariableToString(To_String(evalpart[i])));
+                        output += "\n" + VariableToString(To_String(evalpart[i]));
+                        outputfield.text = output;
+                    }
+
+                    return evalpart[0];
+                case "if":
+                    evalpart.Add(EvaluateExpression(parts[0], scope));
+                    if (VariableToBool(evalpart[0]) == true) { return EvaluateExpression(parts[1], scope); } else { return EvaluateExpression(parts[2], scope); }
+                case "do":
+                    var localVars = new Dictionary<string, Variable>();
+                    List<string> todo = new List<string>();
+                    for (int i = 0; i <= parts.Length - 1; i++)
+                    {
+                        todo.Add(parts[i].Trim());
+                    }
+
+                    VariableValue result = ExecuteFunctionBody(todo, localVars);
+                    return result;
+                case "vec3":
+                    Vec3Value vector_three = new Vec3Value(new Vector3(VariableToFloat(evalpart[0]), VariableToFloat(evalpart[1]), VariableToFloat(evalpart[2])));
+                    return vector_three;
+                case "ptr":
+                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))){return new PointerValue(scope[parts[0].Trim()].ptr); } 
+                    else if(variables.ContainsKey(parts[0].Trim())) {return new PointerValue(variables[parts[0].Trim()].ptr); }
+                    else { return new NullableValue("not variable"); }
+                case "vec_start":
+                    switch (evalpart[0]) { case VecValue(var vv):return new PointerValue(vv.ptr); }return new NullableValue("no ptr");
+                case "to_ptr":return new PointerValue((int)VariableToDouble(evalpart[0]));
+                case "alias":
+                    int a_ptr = (int)VariableToDouble(evalpart[1]);
+                    string a_type = "String";
+                    string a_name = parts[0].Trim();
+                    VariableValue a_value = evalpart[1];
+                    SetVariableWithPtr(a_ptr, a_name, a_type, vmemory.memory[a_ptr], scope);
+                    return a_value;
+                case "val": return vmemory.memory[(int)VariableToDouble(evalpart[0])];
+                case "chars":
+                    char[] chars = VariableToString(evalpart[0]).ToCharArray();
+                    List<VariableValue> charcontents = new List<VariableValue>();
+                    foreach(char Char in chars)
+                    {
+                        charcontents.Add(new StringValue(Char.ToString()));
+                    }
+                    return new VecElements(charcontents);
+                case "vec": List<VariableValue> ret = new List<VariableValue>();for (int i = 0;i < evalpart.Count;i++) { if (evalpart.Count == 1&& parts[0].Trim() == "") { } else { ret.Add(evalpart[i]); } } return new VecElements(ret);
+                case "expand":
+                    List<VariableValue> contents = new List<VariableValue>();
+                    switch (evalpart[0])
+                    {
+                        case VecValue(var vv):
+                            for(int i = 0; i < vv.len; i++)
+                            {
+                                contents.Add(vmemory.memory[vv.ptr + i]);
+                            }
+                            break;
+                    }
+                    return new VecElements(contents);
+                case "=ptr":
+                    vmemory.memory[(int)VariableToDouble(evalpart[0])] = evalpart[1];
+                    return evalpart[1];
+                case "as":return TypeAjust(parts[0].Trim(), evalpart[1]);
+                case "get_at": switch (evalpart[0]) { case VecValue(var vv): int start_ptr = vv.ptr;return vmemory.memory[(int)VariableToDouble(evalpart[1]) + start_ptr]; }return new NullableValue("not vec");
+                case "clear":
+                    switch (evalpart[0])
+                    {
+                        case VecValue(var vv):return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = 0, capacity = vv.capacity });
+                    }
+                    return new NullableValue("not vec");
+                case "len":
+                    switch (evalpart[0]) { case VecValue(var vv):return new I32Value(vv.len); }return new NullableValue("not vec");
+                case "push":
+                    List<VariableValue> push_contents = new List<VariableValue>();
+                    switch (evalpart[0])
+                    {
+                        case VecValue(var vv):
+                            for (int i = 0; i < vv.len; i++)
+                            {
+                                push_contents.Add(vmemory.memory[vv.ptr + i]);
+                            }
+                            if(vv.len + 1 > vv.capacity)
+                            {
+                                push_contents.Add(evalpart[1]);
+                                free(vv.ptr, vv.len);
+                                SetVariable(parts[0].Trim(), "vec", new VecElements(push_contents));
+                                return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 ,capacity = vv.len + 1 });
+                            }
+                            else
+                            {
+                                vmemory.memory[vv.ptr + vv.len] = evalpart[1];
+                                return new VecValue(new VecPtrAndSize { ptr = vv.ptr, len = vv.len + 1 ,capacity = vv.capacity});
+                            }
+                            
+                    }
+                    return new NullableValue("you can't push because it is not vec");
+                case "free":
+                    switch (evalpart[0])
+                    {
+                        case VecValue(var vv):free(vv.ptr, vv.capacity);break;
+                    }
+                    if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr,1); return new PointerValue(scope[parts[0].Trim()].ptr); }
+                    else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new PointerValue(variables[parts[0].Trim()].ptr); }
+                    else { return new NullableValue("not variable"); }
+                case "clear_output":output = ""; outputfield.text = output; return new StringValue(output);
+                case "addforce":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    if(go.TryGetComponent<Rigidbody>(out Rigidbody rigid))
+                                    {
+                                        rigid.AddForce(v3);
+                                        return evalpart[1];
+                                    }
+                                    else
+                                    {
+                                        return new NullableValue("doesn't have RigidBody");
+                                    }
+                                    
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_velocity":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            if (go.TryGetComponent<Rigidbody>(out Rigidbody rigid))
+                            {
+                                Vector3 velocity = rigid.linearVelocity;
+                                return new Vec3Value(velocity);
+                            }
+                            else
+                            {
+                                return new NullableValue("doesn't have RigidBody");
+                            }
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_velocity":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    if (go.TryGetComponent<Rigidbody>(out Rigidbody rigid))
+                                    {
+                                        rigid.linearVelocity = v3;
+                                        return evalpart[0];
+                                    }
+                                    else
+                                    {
+                                        return new NullableValue("doesn't have RigidBody");
+                                    }
+
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_gravity":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case BoolValue(var b):
+                                    if (go.TryGetComponent<Rigidbody>(out Rigidbody rigid))
+                                    {
+                                        rigid.useGravity = b;
+                                        return evalpart[0];
+                                    }
+                                    else
+                                    {
+                                        return new NullableValue("doesn't have RigidBody");
+                                    }
+
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+
+                case "find_object":
+                    GameObject gob = GameObject.Find(VariableToString(evalpart[0]));
+                    return new GameObjectValue(gob);
+                case "find_object_tag":
+                    GameObject[] gobs = GameObject.FindGameObjectsWithTag(VariableToString(evalpart[0]));
+                    List<VariableValue> gobse = new List<VariableValue>(gobs.Length);
+                    foreach (GameObject i in gobs)
+                    {
+                        gobse.Add(new GameObjectValue(i));
+                    }
+                    return new VecElements(gobse);
+                case "get_position":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):return new Vec3Value(go.transform.position);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_rotation":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.rotation.eulerAngles);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_scale":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.localScale);
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_position":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.position = v3;
+                                    return evalpart[0];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_rotation":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.rotation = Quaternion.Euler(v3);
+                                    return evalpart[0];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_scale":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go):
+                            switch (evalpart[1])
+                            {
+                                case Vec3Value(var v3):
+                                    go.transform.localScale = v3;
+                                    return evalpart[0];
+                            }
+                            return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_forward":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.forward);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_up":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.up);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_right":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new Vec3Value(go.transform.right);
+                    }
+                    return new NullableValue("not GameObject");
+                case "get_name":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new StringValue(go.name);
+                    }
+                    return new NullableValue("not GameObject");
+                case "set_name":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): go.name = VariableToString(evalpart[1]); return evalpart[0];
+                    }
+                    return new NullableValue("not GameObject");
+                case "gen_obj":
+                    return GenObject(evalpart[0]);
+                case "set_active":
+                    return ActiveGameObject(evalpart[0], evalpart[1]);
+                case "get_active":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var go): return new BoolValue(go.activeSelf);
+                    }
+                    return new NullableValue("not GameObject");
+                case "type":
+                    return new StringValue(TypeReturn(evalpart[0]));
+                case "destroy":
+                    switch (evalpart[0])
+                    {
+                        case GameObjectValue(var ob):
+                            float time = 0;
+                            if(parts.Length == 2) { time = VariableToFloat(evalpart[1]); }
+                            Destroy(ob,time);
+                            break;
+                    }
+                    return new NullableValue("fail to destroy game object");
+                case "is_first":
+                    return new BoolValue(first_call);
+                case "set_timer":
+                    timers[VariableToString(evalpart[0])] = new Stopwatch();
+                    timers[VariableToString(evalpart[0])].Restart();
+                    return evalpart[0];
+                case "get_timer":
+                    if (timers.ContainsKey(VariableToString(evalpart[0])))
+                    {
+                        return new F64Value(timers[VariableToString(evalpart[0])].Elapsed.TotalSeconds);
+                    }
+                    return evalpart[0];
+            }
+
+            if (functions.ContainsKey(op))
+            {
+                var func = functions[op];
+                var localVars = new Dictionary<string, Variable>();
+                for (int j = 0; j < func.Parameters.Count; j++)
+                {
+                    VariableValue val = EvaluateExpression(parts[j].Trim(), scope);
+                    if (func.Parameters[j].Name.StartsWith("&_"))
+                    {
+                        int ptr = (int)VariableToDouble(val);
+                        SetVariableWithPtr(ptr, func.Parameters[j].Name, func.Parameters[j].Type, vmemory.memory[ptr], localVars);
+                    }
+                    else
+                    {
+                        SetVariable(func.Parameters[j].Name, func.Parameters[j].Type, val, localVars);
+                        //localVars[func.Parameters[j].Name] = new Variable { Type = func.Parameters[j].Type, Value = val };
+                    }
+                }
+                VariableValue result = ExecuteFunctionBody(func.Body, localVars);
+                return result;
+            }
+        }
+        return new StringValue(exprInput.Trim());
+    }
+
+    string[] SplitArgs(string input)
+    {
+        List<string> args = new List<string>();
+        int depth = 0, start = 0;
+        for (int i = 0; i < input.Length; i++)
+        {
+            if (input[i] == '(') depth++;
+            else if (input[i] == ')') depth--;
+            else if (input[i] == ',' && depth == 0)
+            {
+                args.Add(input.Substring(start, i - start).Trim());
+                start = i + 1;
+            }
+        }
+        args.Add(input.Substring(start).Trim());
+        return args.ToArray();
+    }
+
+    void SetVariable(string name, string type, VariableValue value, Dictionary<string, Variable>? scope = null)
+    {
+        if (type.StartsWith("gbl_"))
+        {
+            scope = null;
+            type = type.Substring(4);
+        }
+        int capa = 0;
+        if (type.StartsWith("vec_"))
+        {
+            if(int.TryParse(type.Substring(4).Trim(),out int i)) { capa = i; }
+            type = "vec";
+        }
+        VariableValue value_new = TypeAjust(type,value);
+        int size = 1;
+        if(type=="vec")
+        {
+            switch (TypeReturn(value_new))
+            {
+                case "vec":break;
+                case "vece":
+                    switch (value_new) { 
+                        case VecElements(var ve):
+                            size = ve.Count();
+                            int size_capa = (size > capa) ? size : capa;
+                            int ptr = alloc(size_capa);
+                            for(int i = 0;i<size;i++)
+                            {
+                                vmemory.memory[ptr + i] = ve[i];
+                            }
+                            value_new = new VecValue(new VecPtrAndSize { ptr = ptr, len = size, capacity = size_capa});
+                            size = 1;
+                            break;
+                    }
+                    break;
+            }
+        }
+        if (scope != null) 
+        {
+            if (scope.ContainsKey(name))
+            {
+                scope[name] = new Variable { Type = type, Value = value_new, ptr = scope[name].ptr };
+            }
+            else
+            {
+                int pointer = alloc(size);
+                scope[name] = new Variable { Type = type, Value = value_new, ptr = pointer };
+            }
+            vmemory.memory[scope[name].ptr] = value_new;
+        }
+        else 
+        {
+            if (variables.ContainsKey(name))
+            {
+                variables[name] = new Variable { Type = type, Value = value_new , ptr = variables[name].ptr };
+            }
+            else
+            {
+                int pointer = alloc(size);
+                variables[name] = new Variable { Type = type, Value = value_new, ptr = pointer };
+            }
+            vmemory.memory[variables[name].ptr] = value_new;
+
+        }
+            
+    }
+    void SetVariableWithPtr(int ptr, string name, string type, VariableValue value, Dictionary<string, Variable>? scope = null)
+    {
+        VariableValue value_new = TypeAjust(type, value);
+        if (scope != null)
+        {
+            scope[name] = new Variable { Type = type, Value = value_new, ptr = ptr };
+        }
+        else
+        {
+            variables[name] = new Variable { Type = type, Value = value_new, ptr = ptr };
+        }
+
+    }
+
+    double VariableToDouble(VariableValue value)
+    {
+        double val = 0.0;
+        switch (value)
+        {
+            case I32Value(var i):val = i;break;
+            case I64Value(var l): val = l; break;
+            case F32Value(var f): val = f; break;
+            case F64Value(var d): val = d; break;
+            case PointerValue(var p): val = p; break;
+            case StringValue(var s): val = double.Parse(s);break;
+            case BoolValue(var b): if (b) { val = 1; } else { val = 0; }break; 
+        }
+        return val;
+    }
+
+    float VariableToFloat(VariableValue value)
+    {
+        float val = 0.0f;
+        switch (value)
+        {
+            case I32Value(var i): val = i; break;
+            case I64Value(var l): val = l; break;
+            case F32Value(var f): val = f; break;
+            case F64Value(var d): val = (float)d; break;
+        }
+        return val;
+    }
+
+    VariableValue TypeAjust(string type, VariableValue value)
+    {
+        double val = 0;
+        string s_val = "";
+        bool b_val = false;
+        Vector3 v3_val = Vector3.zero;
+        VecPtrAndSize vps_val = new VecPtrAndSize { ptr = 0, len = 0 ,capacity = 0};
+        bool is_NaV = true;
+        if(type == "String") { value = To_String(value); }
+        switch (value)
+        {
+            case F64Value(var d):val = d;break;
+            case F32Value(var f): val = f; break;
+            case I64Value(var l): val = l; break;
+            case I32Value(var i): val = i; break;
+            case StringValue(var s): s_val = s;if (type == "f64" || type == "f32"||type == "i64"|| type == "i32") { val = double.Parse(s); } break;
+            case BoolValue(var b): b_val = b; if (type == "f64" || type == "f32" || type == "i64" || type == "i32") { if (b) { val = 1; } else { val = 0; } } break;
+            case Vec3Value(var v): v3_val = v; break;
+            case PointerValue(var p):val = p;break;
+            case VecElements(var ve):break;
+            case VecValue(var vv):vps_val = vv;is_NaV = false; break;
+            case GameObjectValue(var gob):break;
+        }
+        switch (type)
+        {
+            case "i32":return new I32Value((int)val);
+            case "i64": return new I64Value((long)val);
+            case "f32": return new F32Value((float)val);
+            case "f64": return new F64Value(val);
+            case "String": return new StringValue(s_val);
+            case "bool": return new BoolValue(b_val);
+            case "vec3": return new Vec3Value(v3_val);
+            case "ptr": return new PointerValue((int)val);
+            case "vec":if (!is_NaV) { return new VecValue(vps_val); } else { return value; }
+            case "gob":return value;
+            default: return value;
+        }
+    }
+    string TypeReturn(VariableValue value)
+    {
+        string ret = "null";
+        switch (value)
+        {
+            case I32Value(var i): ret = "i32"; break;
+            case I64Value(var l): ret = "i64"; break;
+            case F32Value(var f): ret = "f32"; break;
+            case F64Value(var d): ret = "f64"; break;
+            case StringValue(var s): ret = "String"; break;
+            case BoolValue(var b): ret = "bool"; break;
+            case Vec3Value(var v3): ret = "vec3"; break;
+            case PointerValue(var p): ret = "ptr"; break;
+            case VecValue(var v): ret = "vec";break;
+            case VecElements(var ve):ret = "vece";break;
+            case GameObjectValue(var ob): ret = "gob";break;
+        }
+        return ret;
+    }
+    bool VariableToBool(VariableValue value)
+    {
+        bool val = false;
+        switch (value)
+        {
+            case BoolValue(var b):val = b;break;
+        }
+        return val;
+    }
+    string VariableToString(VariableValue value)
+    {
+        string val = "";
+        switch (value)
+        {
+            case StringValue(var b): val = b; break;
+        }
+        return val;
+    }
+    VariableValue To_String(VariableValue value)
+    {
+        string s_val = "";
+        switch (value)
+        {
+            case F64Value(var d): s_val = d.ToString(); break;
+            case F32Value(var f): s_val = f.ToString(); break;
+            case I64Value(var l): s_val = l.ToString(); break;
+            case I32Value(var i): s_val = i.ToString(); break;
+            case StringValue(var s): s_val = s; break;
+            case BoolValue(var b): s_val = b.ToString(); break;
+            case PointerValue(var p): s_val = p.ToString();break;
+            case GameObjectValue(var ob):s_val = ob.name;break;
+            case NullableValue(var n):if (n == "") { s_val = "Null"; } else { s_val = n; } break;
+        }
+        return new StringValue(s_val);
+    }
+    int alloc(int size)
+    {
+        int start = vmemory.emptyArea[0].start;
+        int pre_size = vmemory.emptyArea[0].size;
+        int index = 0;
+        for(int i = 0; i < vmemory.emptyArea.Count; i++)
+        {
+            if(vmemory.emptyArea[i].size >= size)
+            {
+                start = vmemory.emptyArea[i].start;
+                pre_size = vmemory.emptyArea[i].size;
+                index = i;
+                break;
+            }
+        }
+        vmemory.emptyArea.RemoveAt(index);
+        vmemory.emptyArea.Add(new EmptyArea { start = start + size, size = pre_size - size });
+
+        return start;
+    }
+    void free(int ptr,int size)
+    {
+        for(int i = 0;i < size; i++)
+        {
+            vmemory.memory[ptr + i] = new NullableValue("");
+        }
+        vmemory.emptyArea.Add(new EmptyArea { start = ptr, size = size });
+        connectEnptyMem();
+    }
+
+    void connectEnptyMem()
+    {
+        vmemory.emptyArea.Sort((a, b) => a.start.CompareTo(b.start));
+        List<EmptyArea> NewEmpty = new List<EmptyArea>(vmemory.emptyArea.Count);
+        foreach(EmptyArea emptyarea in vmemory.emptyArea)
+        {
+            if(NewEmpty.Count > 0 && NewEmpty[NewEmpty.Count - 1].end() == emptyarea.start - 1 )
+            {
+                NewEmpty[NewEmpty.Count - 1].size += emptyarea.size;
+            }
+            else
+            {
+                NewEmpty.Add(emptyarea);
+            }
+        }
+        vmemory.emptyArea = NewEmpty;
+    }
+    VariableValue GenObject(VariableValue shape)
+    {
+        switch (shape)
+        {
+            case StringValue(var s):
+                switch (s)
+                {
+                    case "cube":
+                        GameObject cube = Instantiate<GameObject>(cubePrefab,new Vector3(0f,0f,0f),Quaternion.identity);
+                        return new GameObjectValue(cube);
+                    case "sphere":
+                        GameObject sphere = Instantiate<GameObject>(spherePrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+                        return new GameObjectValue(sphere);
+                    case "cube_rigid":
+                        GameObject cube_rigid = Instantiate<GameObject>(RigidCubePrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+                        return new GameObjectValue(cube_rigid);
+                    case "sphere_rigid":
+                        GameObject sphere_rigid = Instantiate<GameObject>(RigidSpherePrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+                        return new GameObjectValue(sphere_rigid);
+                }
+                break;
+        }
+        return new NullableValue("fail to generate GameObject");
+    }
+    VariableValue ActiveGameObject(VariableValue ob,VariableValue active)
+    {
+        switch (ob)
+        {
+
+            case GameObjectValue(var obj):
+                switch (active) 
+                {
+                    case BoolValue(var b):
+                        obj.SetActive(b);
+                        return ob;
+                }
+                break;
+        }
+        return new NullableValue("set active");
+    }
+    
+
+}
