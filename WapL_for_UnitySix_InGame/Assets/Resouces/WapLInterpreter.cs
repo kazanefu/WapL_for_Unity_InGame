@@ -1,8 +1,10 @@
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Unity.Android.Gradle;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
@@ -375,7 +377,7 @@ public class WapLInterpreter : MonoBehaviour
             string[] parts = SplitArgs(inside);
 
             List<VariableValue> evalpart = new List<VariableValue>(parts.Length);
-            if (op != "do" && op != "if")
+            if (op != "do" && op != "if" && op != "iter")
             {
                 for (int l = 0; l < parts.Length; l++)
                 {
@@ -794,6 +796,55 @@ public class WapLInterpreter : MonoBehaviour
                         return new F64Value(timers[VariableToString(evalpart[0])].Elapsed.TotalSeconds);
                     }
                     return evalpart[0];
+                case "iter":
+                    switch (EvaluateExpression(parts[0].Trim(), scope))
+                    {
+                        case VecElements(var ve):
+                            List<VariableValue> collection = new List<VariableValue>(ve.Count);
+                            List<VariableValue> elements = ve;
+                            for (int i = 1; i < parts.Length; i++)
+                            {
+                                var localVars_iter = new Dictionary<string, Variable>();
+                                string typename = "";
+                                string valname = "_";
+                                if (parts[i].Contains("(") && parts[i].EndsWith(")"))
+                                {
+                                    int lparen_iter = parts[i].IndexOf('(');
+                                    string op_iter = parts[i].Substring(0, lparen_iter);
+                                    string inside_iter = parts[i].Substring(lparen_iter + 1, parts[i].Length - lparen_iter - 2);
+                                    string[] parts_iter = SplitArgs(inside_iter);
+                                    valname = parts_iter[0].Trim();
+                                    switch (op_iter)
+                                    {
+                                        case "map":
+                                            foreach(var x in elements)
+                                            {
+                                                typename = TypeReturn(x);
+                                                SetVariable(valname, typename, x, localVars_iter);
+                                                collection.Add(EvaluateExpression(parts_iter[1], localVars_iter));
+                                            }
+                                            elements = new List<VariableValue>(collection);
+                                            collection.Clear();
+                                            break;
+                                        case "filter":
+                                            foreach (var x in elements)
+                                            {
+                                                typename = TypeReturn(x);
+                                                SetVariable(valname, typename, x, localVars_iter);
+                                                var bool_result = EvaluateExpression(parts_iter[1], localVars_iter);
+                                                if (VariableToBool(bool_result)) { collection.Add(x); }
+                                                
+                                            }
+                                            elements = new List<VariableValue>(collection);
+                                            collection.Clear();
+                                            break;
+                                    }
+                                }
+                                
+                            }
+                            return new VecElements(collection);
+                    }
+                    return new NullableValue("not iter");
             }
 
             if (functions.ContainsKey(op))
