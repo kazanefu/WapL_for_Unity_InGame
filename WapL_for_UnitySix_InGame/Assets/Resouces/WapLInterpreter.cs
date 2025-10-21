@@ -805,6 +805,7 @@ public class WapLInterpreter : MonoBehaviour
                             for (int i = 1; i < parts.Length; i++)
                             {
                                 var localVars_iter = new Dictionary<string, Variable>();
+                                collection.Clear();
                                 string typename = "";
                                 string valname = "_";
                                 if (parts[i].Contains("(") && parts[i].EndsWith(")"))
@@ -820,15 +821,29 @@ public class WapLInterpreter : MonoBehaviour
                                             foreach(var x in elements)
                                             {
                                                 typename = TypeReturn(x);
+                                                UnityEngine.Debug.Log(typename);
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 collection.Add(EvaluateExpression(parts_iter[1], localVars_iter));
                                                 foreach (var f in localVars_iter)
                                                 {
                                                     string f_type = f.Value.Type;
                                                     int f_ptr = f.Value.ptr;
-                                                    if (!f.Key.StartsWith("&_")) { free(f_ptr, 1); }
+                                                    if (!f.Key.StartsWith("&_")) 
+                                                    { 
+                                                        if (f_type == "vec") 
+                                                        {
+                                                            switch (f.Value.Value)
+                                                            {
+                                                                case VecValue(var vv):
+                                                                    free(vv.ptr, vv.capacity);
+                                                                    break;
+                                                            }
+                                                        } 
+                                                        free(f_ptr, 1);
+                                                    }
                                                     
                                                 }
+                                                localVars_iter = new Dictionary<string, Variable>();
                                             }
                                             elements = new List<VariableValue>(collection);
                                             collection.Clear();
@@ -844,10 +859,24 @@ public class WapLInterpreter : MonoBehaviour
                                                 {
                                                     string f_type = f.Value.Type;
                                                     int f_ptr = f.Value.ptr;
-                                                    if (!f.Key.StartsWith("&_")) { free(f_ptr, 1); }
+                                                    if (!f.Key.StartsWith("&_")) 
+                                                    {
+                                                        if (f_type == "vec")
+                                                        {
+                                                            switch (f.Value.Value)
+                                                            {
+                                                                case VecValue(var vv):
+                                                                    free(vv.ptr, vv.capacity);
+                                                                    break;
+                                                            }
+                                                        }
+                                                        free(f_ptr, 1); 
+                                                    }
 
                                                 }
+                                                localVars_iter = new Dictionary<string, Variable>();
                                             }
+                                            
                                             elements = new List<VariableValue>(collection);
                                             collection.Clear();
                                             break;
@@ -855,8 +884,12 @@ public class WapLInterpreter : MonoBehaviour
                                 }
                                 
                             }
-                            
-                            return new VecElements(collection);
+                            foreach(var x in elements)
+                            {
+                                UnityEngine.Debug.Log(TypeReturn(x));
+
+                            }
+                            return new VecElements(elements);
                     }
                     return new NullableValue("not iter");
             }
