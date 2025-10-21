@@ -42,7 +42,7 @@ class Memory
 }
 class Variable
 {
-    public string Type; // "i32","f32", "String", "bool", "vec3", "gameobject", "component","ptr","list"
+    public string Type; // "i32","f32", "String", "bool", "vec3", "gameobject", "component","ptr","vec"
     public int ptr;
     public VariableValue Value;
 }
@@ -822,6 +822,13 @@ public class WapLInterpreter : MonoBehaviour
                                                 typename = TypeReturn(x);
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 collection.Add(EvaluateExpression(parts_iter[1], localVars_iter));
+                                                foreach (var f in localVars_iter)
+                                                {
+                                                    string f_type = f.Value.Type;
+                                                    int f_ptr = f.Value.ptr;
+                                                    if (!f.Key.StartsWith("&_")) { free(f_ptr, 1); }
+                                                    
+                                                }
                                             }
                                             elements = new List<VariableValue>(collection);
                                             collection.Clear();
@@ -833,7 +840,13 @@ public class WapLInterpreter : MonoBehaviour
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 var bool_result = EvaluateExpression(parts_iter[1], localVars_iter);
                                                 if (VariableToBool(bool_result)) { collection.Add(x); }
-                                                
+                                                foreach (var f in localVars_iter)
+                                                {
+                                                    string f_type = f.Value.Type;
+                                                    int f_ptr = f.Value.ptr;
+                                                    if (!f.Key.StartsWith("&_")) { free(f_ptr, 1); }
+
+                                                }
                                             }
                                             elements = new List<VariableValue>(collection);
                                             collection.Clear();
@@ -842,6 +855,7 @@ public class WapLInterpreter : MonoBehaviour
                                 }
                                 
                             }
+                            
                             return new VecElements(collection);
                     }
                     return new NullableValue("not iter");
