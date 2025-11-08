@@ -88,14 +88,14 @@ public class WapLInterpreter : MonoBehaviour
     public void ReadInput()
     {
         input = inputfield.text;
-        flash();
+        refresh();
     }
     public void ReadInputFromString(string code)
     {
         input = code;
-        flash();
+        refresh();
     }
-    void flash()
+    void refresh()
     {
         first_call = true;
         timers = new Dictionary<string, Stopwatch>();
