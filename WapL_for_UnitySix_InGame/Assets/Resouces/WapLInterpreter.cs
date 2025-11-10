@@ -472,11 +472,10 @@ public class WapLInterpreter : MonoBehaviour
                     
                 case "input":
                     //ÉQÅ[ÉÄì‡Ç≈ÉRÉìÉ\Å[ÉãÇÃì¸óÕÇÕéÛÇØÇ»Ç¢ÇÃÇ≈îpé~
-                    //string input_name = evalpart[0];
-                    //Console.Write($"ì¸óÕ [{input_name}]: ");
-                    //string input_value = Console.ReadLine() ?? "";
-                    //return input_value;
-                    return new StringValue(exprInput.Trim());
+                    string input_name = VariableToString(To_String(evalpart[0]));
+                    Console.Write($"ì¸óÕ [{input_name}]: ");
+                    string input_value = Console.ReadLine() ?? "";
+                    return new StringValue(input_value);
                 case "print":
                     for (int i = 0; i <= parts.Length - 1; i++)
                     {
@@ -527,6 +526,56 @@ public class WapLInterpreter : MonoBehaviour
                     }
                     return new VecElements(charcontents);
                 case "vec": List<VariableValue> ret = new List<VariableValue>();for (int i = 0;i < evalpart.Count;i++) { if (evalpart.Count == 1&& parts[0].Trim() == "") { } else { ret.Add(evalpart[i]); } } return new VecElements(ret);
+                case "rangei":
+                    int rangeiStart = 0;
+                    int rangeiEnd = 0;
+                    int rangeiStep = 1;
+                    if (parts.Length == 1)
+                    {
+                        rangeiEnd = (int)VariableToDouble(evalpart[0]);
+                    }
+                    else if (parts.Length == 2)
+                    {
+                        rangeiStart = (int)VariableToDouble(evalpart[0]);
+                        rangeiEnd = (int)VariableToDouble(evalpart[1]);
+                    }
+                    else if (parts.Length == 3)
+                    {
+                        rangeiStart = (int)VariableToDouble(evalpart[0]);
+                        rangeiEnd = (int)VariableToDouble(evalpart[1]);
+                        rangeiStep = (int)VariableToDouble(evalpart[2]);
+                    }
+                    List<VariableValue> rangeiret = new List<VariableValue>();
+                    for (int i = rangeiStart; i < rangeiEnd; i += rangeiStep)
+                    {
+                        rangeiret.Add(new I32Value(i));
+                    }
+                    return new VecElements(rangeiret);
+                case "rangef":
+                    double rangefStart = 0.0;
+                    double rangefEnd = 0.0;
+                    double rangefStep = 1.0;
+                    if (parts.Length == 1)
+                    {
+                        rangefEnd = VariableToDouble(evalpart[0]);
+                    }
+                    else if (parts.Length == 2)
+                    {
+                        rangefStart = VariableToDouble(evalpart[0]);
+                        rangefEnd = VariableToDouble(evalpart[1]);
+                    }
+                    else if (parts.Length == 3)
+                    {
+                        rangefStart = VariableToDouble(evalpart[0]);
+                        rangefEnd = VariableToDouble(evalpart[1]);
+                        rangefStep = VariableToDouble(evalpart[2]);
+                    }
+                    List<VariableValue> rangefret = new List<VariableValue>();
+                    for (double i = rangefStart; i < rangefEnd; i += rangefStep)
+                    {
+                        rangefret.Add(new F64Value(i));
+                    }
+                    return new VecElements(rangefret);
                 case "expand":
                     List<VariableValue> contents = new List<VariableValue>();
                     switch (evalpart[0])
@@ -821,7 +870,6 @@ public class WapLInterpreter : MonoBehaviour
                                             foreach(var x in elements)
                                             {
                                                 typename = TypeReturn(x);
-                                                UnityEngine.Debug.Log(typename);
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 collection.Add(EvaluateExpression(parts_iter[1], localVars_iter));
                                                 foreach (var f in localVars_iter)
@@ -883,11 +931,6 @@ public class WapLInterpreter : MonoBehaviour
                                     }
                                 }
                                 
-                            }
-                            foreach(var x in elements)
-                            {
-                                UnityEngine.Debug.Log(TypeReturn(x));
-
                             }
                             return new VecElements(elements);
                     }
