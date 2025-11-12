@@ -481,6 +481,16 @@ public class WapLInterpreter : MonoBehaviour
                     {
                         //Console.WriteLine(evalpart[i]);
                         UnityEngine.Debug.Log(VariableToString(To_String(evalpart[i])));
+                        output += "" + VariableToString(To_String(evalpart[i]));
+                        outputfield.text = output;
+                    }
+
+                    return evalpart[0];
+                case "println":
+                    for (int i = 0; i <= parts.Length - 1; i++)
+                    {
+                        //Console.WriteLine(evalpart[i]);
+                        UnityEngine.Debug.Log(VariableToString(To_String(evalpart[i])));
                         output += "\n" + VariableToString(To_String(evalpart[i]));
                         outputfield.text = output;
                     }
@@ -494,11 +504,41 @@ public class WapLInterpreter : MonoBehaviour
                     List<string> todo = new List<string>();
                     for (int i = 0; i <= parts.Length - 1; i++)
                     {
-                        todo.Add(parts[i].Trim());
+                        if (parts[i].StartsWith("takein("))
+                        {
+                            int do_lparen = parts[i].IndexOf('(');
+                            string do_op = parts[i].Substring(0, do_lparen);
+                            string do_inside = parts[i].Substring(do_lparen + 1, parts[i].Length - do_lparen - 2);
+                            string[] do_parts = SplitArgs(do_inside);
+                            foreach (string quote in do_parts)
+                            {
+                                if ((scope != null && scope.ContainsKey(quote)))
+                                {
+                                    localVars[quote] = scope[quote];
+                                }
+                                else if (variables.ContainsKey(quote))
+                                {
+                                    localVars[quote] = variables[quote];
+                                }
+                                else { return new NullableValue("no defined variable"); }
+                            }
+                        }
+                        else
+                        {
+                            todo.Add(parts[i].Trim());
+                        }
                     }
-
                     VariableValue result = ExecuteFunctionBody(todo, localVars);
                     return result;
+                case "expel":
+                    if (scope != null && scope.ContainsKey(parts[0]))
+                    {
+                        return new BoolValue(scope.Remove(parts[0]));
+                    }
+                    else
+                    {
+                        return new NullableValue("can't find this variable in this scope");
+                    }
                 case "vec3":
                     Vec3Value vector_three = new Vec3Value(new Vector3(VariableToFloat(evalpart[0]), VariableToFloat(evalpart[1]), VariableToFloat(evalpart[2])));
                     return vector_three;
@@ -625,10 +665,35 @@ public class WapLInterpreter : MonoBehaviour
                             
                     }
                     return new NullableValue("you can't push because it is not vec");
+                case "malloc":
+                    int mallocptr = alloc((int)VariableToDouble(evalpart[0]));
+                    return new PointerValue(mallocptr);
+                case "memcpy":
+                    int dest = (int)VariableToDouble(evalpart[0]);
+                    int src = (int)VariableToDouble(evalpart[1]);
+                    for(int i = 0; i < (int)VariableToDouble(evalpart[2]); i++)
+                    {
+                        vmemory.memory[dest + i] = vmemory.memory[src + i];
+                    }
+                    return evalpart[0];
+                case "memset":
+                    int setdest = (int)VariableToDouble(evalpart[0]);
+                    VariableValue setval = evalpart[1];
+                    for(int i = 0; i<(int)VariableToDouble(evalpart[2]); i++)
+                    {
+                        vmemory.memory[setdest + i] = setval;
+                    }
+                    return evalpart[0];
                 case "free":
                     switch (evalpart[0])
                     {
                         case VecValue(var vv):free(vv.ptr, vv.capacity);break;
+                        case PointerValue(var p):
+                            if (evalpart.Count == 2)
+                            {
+                                free(p, (int)VariableToDouble(evalpart[1]));
+                            }
+                            break;
                     }
                     if ((scope != null && scope.ContainsKey(parts[0].Trim()))) { free(scope[parts[0].Trim()].ptr,1); return new PointerValue(scope[parts[0].Trim()].ptr); }
                     else if (variables.ContainsKey(parts[0].Trim())) { free(variables[parts[0].Trim()].ptr, 1); return new PointerValue(variables[parts[0].Trim()].ptr); }
@@ -895,6 +960,9 @@ public class WapLInterpreter : MonoBehaviour
                                             }
                                             elements = new List<VariableValue>(collection);
                                             collection.Clear();
+                                            break;
+                                        case "rev":
+                                            elements.Reverse();
                                             break;
                                         case "filter":
                                             foreach (var x in elements)
