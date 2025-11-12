@@ -24,6 +24,43 @@ record PointerValue(int Data): VariableValue;
 record VecValue(VecPtrAndSize Data) : VariableValue;
 record VecElements(List<VariableValue> Data):VariableValue;
 record GameObjectValue(GameObject Data):VariableValue;
+record IteratorValue(Iterator Data) : VariableValue;
+
+class Iterator
+{
+    public VecElements element;
+    public int size;
+    public int pos;
+    public void next()
+    {
+        pos++;
+    }
+    public VariableValue peek()
+    {
+        VariableValue ret = new NullableValue("");
+        if(pos >= size) { return new NullableValue("Used up"); }
+        switch (element)
+        {
+            case VecElements(var ve):ret = ve[pos];break;
+        }
+        return ret;
+    }
+    public void setsize()
+    {
+        switch (element)
+        {
+            case VecElements(var ve): size = ve.Count; break;
+        }
+    }
+    public void begin()
+    {
+        pos = 0;
+    }
+    public void end()
+    {
+        pos = size - 1;
+    }
+}
 
 class VecPtrAndSize { public int ptr;public int len;public int capacity; }
 class EmptyArea
@@ -491,7 +528,7 @@ public class WapLInterpreter : MonoBehaviour
                     {
                         //Console.WriteLine(evalpart[i]);
                         UnityEngine.Debug.Log(VariableToString(To_String(evalpart[i])));
-                        output += "\n" + VariableToString(To_String(evalpart[i]));
+                        output += "" + VariableToString(To_String(evalpart[i])) + "\n";
                         outputfield.text = output;
                     }
 
@@ -910,12 +947,36 @@ public class WapLInterpreter : MonoBehaviour
                         return new F64Value(timers[VariableToString(evalpart[0])].Elapsed.TotalSeconds);
                     }
                     return evalpart[0];
+                case "next": 
+                    switch (evalpart[0])
+                    {
+                        case IteratorValue(var iter):iter.next();return iter.peek();
+                    }
+                    return new NullableValue("not iterator");
+                case "peek":
+                    switch (evalpart[0])
+                    {
+                        case IteratorValue(var iter):return iter.peek();
+                    }
+                    return new NullableValue("not iterator");
+                case "begin":
+                    switch (evalpart[0])
+                    {
+                        case IteratorValue(var iter): iter.begin(); return iter.peek();
+                    }
+                    return new NullableValue("not iterator");
+                case "end":
+                    switch (evalpart[0])
+                    {
+                        case IteratorValue(var iter): iter.end(); return iter.peek();
+                    }
+                    return new NullableValue("not iterator");
                 case "iter":
                     switch (EvaluateExpression(parts[0].Trim(), scope))
                     {
                         case VecElements(var ve):
                             List<VariableValue> collection = new List<VariableValue>(ve.Count);
-                            List<VariableValue> elements = ve;
+                            Iterator elements = new Iterator { element = new VecElements(ve),size = ve.Count,pos = 0};
                             for (int i = 1; i < parts.Length; i++)
                             {
                                 var localVars_iter = new Dictionary<string, Variable>();
@@ -932,8 +993,10 @@ public class WapLInterpreter : MonoBehaviour
                                     switch (op_iter)
                                     {
                                         case "map":
-                                            foreach(var x in elements)
+                                            //foreach(var x in elements)
+                                            while(elements.pos < elements.size)
                                             {
+                                                var x = elements.peek();
                                                 typename = TypeReturn(x);
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 collection.Add(EvaluateExpression(parts_iter[1], localVars_iter));
@@ -957,16 +1020,30 @@ public class WapLInterpreter : MonoBehaviour
                                                     
                                                 }
                                                 localVars_iter = new Dictionary<string, Variable>();
+                                                elements.next();
                                             }
-                                            elements = new List<VariableValue>(collection);
+                                            var element_element_list = new List<VariableValue>(collection);
+                                            var element_element = new VecElements(element_element_list);
+                                            elements = new Iterator { element = element_element, size = element_element_list.Count,pos = 0 };
                                             collection.Clear();
                                             break;
                                         case "rev":
-                                            elements.Reverse();
+                                            while(elements.pos < elements.size)
+                                            {
+                                                var x = elements.peek();
+                                                collection.Add(x);
+                                                elements.next();
+                                            }
+                                            collection.Reverse();
+                                            var rev_list = new List<VariableValue>(collection);
+                                            var element_rev = new VecElements(rev_list);
+                                            elements = new Iterator { element = element_rev, size = rev_list.Count, pos = 0 };
+                                            collection.Clear();
                                             break;
                                         case "filter":
-                                            foreach (var x in elements)
+                                            while (elements.pos < elements.size)
                                             {
+                                                var x = elements.peek();
                                                 typename = TypeReturn(x);
                                                 SetVariable(valname, typename, x, localVars_iter);
                                                 var bool_result = EvaluateExpression(parts_iter[1], localVars_iter);
@@ -991,16 +1068,18 @@ public class WapLInterpreter : MonoBehaviour
 
                                                 }
                                                 localVars_iter = new Dictionary<string, Variable>();
+                                                elements.next();
                                             }
-                                            
-                                            elements = new List<VariableValue>(collection);
+                                            var filter_list = new List<VariableValue>(collection);
+                                            var filter_element = new VecElements(filter_list);
+                                            elements = new Iterator { element = filter_element, size = filter_list.Count, pos = 0 };
                                             collection.Clear();
                                             break;
                                     }
                                 }
                                 
                             }
-                            return new VecElements(elements);
+                            return elements.element;
                     }
                     return new NullableValue("not iter");
             }
@@ -1080,6 +1159,27 @@ public class WapLInterpreter : MonoBehaviour
                             }
                             value_new = new VecValue(new VecPtrAndSize { ptr = ptr, len = size, capacity = size_capa});
                             size = 1;
+                            break;
+                    }
+                    break;
+                case "iter":
+                    switch (value_new)
+                    {
+                        case IteratorValue(var ie):
+                            switch (ie.element)
+                            {
+                                case VecElements(var ve):
+                                    size = ve.Count();
+                                    int size_capa = (size > capa) ? size : capa;
+                                    int ptr = alloc(size_capa);
+                                    for (int i = 0; i < size; i++)
+                                    {
+                                        vmemory.memory[ptr + i] = ve[i];
+                                    }
+                                    value_new = new VecValue(new VecPtrAndSize { ptr = ptr, len = size, capacity = size_capa });
+                                    size = 1;
+                                    break;
+                            }
                             break;
                     }
                     break;
@@ -1176,9 +1276,10 @@ public class WapLInterpreter : MonoBehaviour
             case BoolValue(var b): b_val = b; if (type == "f64" || type == "f32" || type == "i64" || type == "i32") { if (b) { val = 1; } else { val = 0; } } break;
             case Vec3Value(var v): v3_val = v; break;
             case PointerValue(var p):val = p;break;
-            case VecElements(var ve):break;
+            case VecElements(var ve):if (type == "iter") { return new IteratorValue(new Iterator { element = new VecElements(ve), pos = 0, size = ve.Count }); } break;
             case VecValue(var vv):vps_val = vv;is_NaV = false; break;
             case GameObjectValue(var gob):break;
+            case IteratorValue(var iter): if (type == "vec") { return iter.element; } break;
         }
         switch (type)
         {
@@ -1211,6 +1312,7 @@ public class WapLInterpreter : MonoBehaviour
             case VecValue(var v): ret = "vec";break;
             case VecElements(var ve):ret = "vece";break;
             case GameObjectValue(var ob): ret = "gob";break;
+            case IteratorValue(var iter):ret = "iter";break;
         }
         return ret;
     }
