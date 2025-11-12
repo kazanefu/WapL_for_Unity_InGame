@@ -668,7 +668,10 @@ public class WapLInterpreter : MonoBehaviour
                 case "=ptr":
                     vmemory.memory[(int)VariableToDouble(evalpart[0])] = evalpart[1];
                     return evalpart[1];
-                case "as":return TypeAjust(parts[0].Trim(), evalpart[1]);
+                case "as":
+                    string as_type = parts[0].Trim();
+                    if (TypeReturn(evalpart[0]) == "String") { as_type = VariableToString(evalpart[0]); }
+                    return TypeAjust(as_type, evalpart[1]);
                 case "get_at": switch (evalpart[0]) { case VecValue(var vv): int start_ptr = vv.ptr;return vmemory.memory[(int)VariableToDouble(evalpart[1]) + start_ptr]; }return new NullableValue("not vec");
                 case "clear":
                     switch (evalpart[0])
