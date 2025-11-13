@@ -595,5 +595,5 @@ warpto(Inf);//無限ループの可能性があります:Inf;
 
 ### その他
 
-wapl_invader.waplにまだ作り途中かつ雑に書いたものですが弾を打って5つの敵にあてると消えるというだけの簡単なサンプルコードがあります.
+([wapl_invader.wapl](https://github.com/kazanefu/WapL_for_Unity_InGame/blob/main/wapl_invader.wapl))にまだ作り途中かつ雑に書いたものですが弾を打って5つの敵にあてると消えるというだけの簡単なサンプルコードがあります.
 
