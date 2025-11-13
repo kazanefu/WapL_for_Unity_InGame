@@ -1,0 +1,162 @@
+warptoif(not(is_first()),START);
+
+point Restart;
+print("ゲームスタート");
+=(pre_resetbutton,true,bool);
+
+=(camera,find_object(Main Camera),gob);
+=(player,gen_obj("cube"),gob);
+set_position(player,vec3(0,-3,0));
+set_name(player,PLAYER);
+=(max,100,i32);
+clear_output();
+=(delta,"a",String);
+=(shot_delta,"b",String);
+set_timer(delta);
+set_timer(shot_delta);
+=(speed,10,f32);
+
+=(bulletspeed,100,f32);
+=(shot_interval,0.25,f32);
+=(bullets,vec(),vec_10);
+=(i,0,i32);
+point GEN_Bullet_start;
+warptoif(>=(i,10),GEN_Bullet_end);
+=(bullet_temp,gen_obj("sphere"),gob);
+set_name(bullet_temp,BulletP1);
+set_active(bullet_temp,false);
+=(bullets,push(bullets,bullet_temp));
++=(i,1);
+warpto(GEN_Bullet_start);
+point GEN_Bullet_end;
+
+=(enemycount,5,i32);
+=(enemys,vec(set_name(gen_obj("cube"),ENEMY),set_name(gen_obj("cube"),ENEMY),set_name(gen_obj("cube"),ENEMY),set_name(gen_obj("cube"),ENEMY),set_name(gen_obj("cube"),ENEMY)),vec_5);
+=(i,0,i32);
+point GEN_Enemy_start;
+warptoif(>=(i,len(enemys)),GEN_Enemy_end);
+set_position(get_at(enemys,i),vec3(*(-(i,3),10),-3,75));
+set_active(get_at(enemys,i),true);
++=(i,1);
+warpto(GEN_Enemy_start);
+point GEN_Enemy_end;
+
+=(deltaTime,0,f64);
+
+point START;
+set_timer(delta);
+
+//camera&player;
+
+clear_output();
+=(move,0,f32);
+warptoif(not(keyboard_D),D);
++=(move,1);
+point D;
+warptoif(not(keyboard_A),A);
+-=(move,1);
+point A;
+=(pos,get_position(player),vec3);
+set_position(player,vec3(+(pos(x),*(*(speed,deltaTime),move)),pos(y),pos(z)));
+set_position(camera,vec3(+(pos(x),*(*(speed,deltaTime),move)),+(pos(y),4),-(pos(z),7)));
+
+//;
+
+//shot;
+if(keyboard_Space,shot(pos),false);
+fn shot(vec3 shotpos){;
+    warptoif(<=(get_timer(shot_delta),shot_interval),shot_ret);
+    =(shotpos,vec3(shotpos(x),shotpos(y),+(shotpos(z),2)));
+    =(j,0,i32);
+    point shot_start;
+    warptoif(not(get_active(get_at(bullets,j))),shot_break);
+    +=(j,1);
+    warptoif(>=(j,len(bullets)),shot_ret);
+    warpto(shot_start);
+    point shot_break;
+    set_active(get_at(bullets,j),true);
+    set_position(get_at(bullets,j),shotpos);
+    set_timer(shot_delta);
+    point shot_ret;
+    return "";
+};
+
+//move bullets;
+=(i,-1,i32);
+point bulletmove_start;
++=(i,1);
+warptoif(>=(i,len(bullets)),bulletmove_break);
+warptoif(not(get_active(get_at(bullets,i))),bulletmove_start);
+=(bulletpos,get_position(get_at(bullets,i)),vec3);
+
+set_position(get_at(bullets,i),vec3(bulletpos(x),bulletpos(y),+(bulletpos(z),*(bulletspeed,deltaTime))));
+if(>=(bulletpos(z),100),set_active(get_at(bullets,i),false),false);
+warpto(bulletmove_start);
+point bulletmove_break;
+//here is reset;
+
+//move enemys;
+=(i,0,i32);
+point loop_enemy;
+warptoif(not(get_active(get_at(enemys,i))),loop_enemy_continue);
+    =(j,0,i32);
+    point loop_bullet;
+
+        =(isActive,and(get_active(get_at(bullets,j)),get_active(get_at(enemys,i))),bool);
+        warptoif(not(isActive),loop_bullet_continue);
+        =(bullet_pos,get_position(get_at(bullets,j)),vec3);
+        =(enemy_pos,get_position(get_at(enemys,i)),vec3);
+        =(x,-(bullet_pos(x),enemy_pos(x)),f32);
+        =(y,-(bullet_pos(y),enemy_pos(y)),f32);
+        =(z,-(bullet_pos(z),enemy_pos(z)),f32);
+        =(distance,0,f32);
+        +=(distance,*(x,x));
+        +=(distance,*(y,y));
+        +=(distance,*(z,z));
+        if(and(<=(distance,4),isActive),do(set_active(get_at(enemys,i),false),-=(enemycount,1),print(enemycount)),false);
+    point loop_bullet_continue;
+    +=(j,1);
+    warptoif(<(j,len(bullets)),loop_bullet);
+point loop_enemy_continue;
++=(i,1);
+warptoif(<(i,len(enemys)),loop_enemy);
+
+fn respawn(gob &_cube){;
+    =(&_cube,gen_obj("cube"),gob);
+    set_position(&_cube,vec3(0,-100,0));
+    set_name(&_cube,PLAYER);
+    clear_output();
+    return "";
+};
+warptoif(and(>=(pos(x),*(max,-1)),<=(pos(x),max)),Del);
+destroy(player);
+respawn(ptr(player));
+point Del;
+=(deltaTime,get_timer(delta),f64);
+
+warptoif(or(not(keyboard_Escape),pre_resetbutton),EndOfFrame);
+del_all();
+warpto(Restart);
+point EndOfFrame;
+=(pre_resetbutton,keyboard_Escape);
+
+fn del_all(){;
+    =(i,0,i32);
+    point read_bullets;
+    set_active(get_at(bullets,i),true);
+    +=(i,1);
+    warptoif(<(i,len(bullets)),read_bullets);
+    vec(set_active(get_at(enemys,0),true),set_active(get_at(enemys,1),true),set_active(get_at(enemys,2),true),set_active(get_at(enemys,3),true),set_active(get_at(enemys,4),true));
+    =(created,find_object_tag(Created),vec);
+    =(i,0,i32);
+    point del_loop;
+    warptoif(>=(i,len(created)),del_break);
+    destroy(get_at(created,i));
+    +=(i,1);
+    warpto(del_loop);
+    point del_break;
+    free(created);
+    clear(bullets);
+    clear(enemys);
+    print("delete all");
+};
