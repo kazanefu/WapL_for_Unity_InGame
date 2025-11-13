@@ -51,7 +51,7 @@ println(ptr(a));
 println(type(a));
 println(a);
 ```
-ptr(変数名)でポインタを得られます.詳しくはメモリ管理の章で説明します.<br>type()はその値の型を返します<br>
+ptr(変数名)でポインタを得られます.詳しくは第3章で説明します.<br>type()はその値の型を返します<br>
 このコードを実行すると
 ```
 0
@@ -318,7 +318,7 @@ fn main(){;
     =(a,1,i32);
     =(b,2,i32);
     do(takein(a,b),println(a,b),expel(a),return 0); //1,2;
-    println(a,b);//1,b;
+    println(a,b);//1,Null;
 };
 ```
 
@@ -359,6 +359,22 @@ memset(src,"hoge",size);
 memcpy(dest,src,size);
 ```
 memcpy()はメモリ領域srcの先頭からsize分をメモリ領域destにコピーします<br>
+
+#### 変数のポインタ
+
+```wapl
+=(a,3,i32);
+
+=(p,ptr(a),ptr);
+
+println(val(p));
+
+=ptr(p,5);
+
+println(val(p));
+```
+**ptr**でその変数のポインタを取得でき,valでそのポインタの指す場所にある値を取り出すことができます.
+また,**=ptr**でそのポインタの指す場所の値を直接書き換えることができます.
 
 ### 第4章 イテレータ関連の関数
 
@@ -476,8 +492,103 @@ set_active(set_position(set_name(gen_obj("cube"),CUBE),vec3(0,0,0)),false);
 ```wapl
 =(A,keyboard_A,bool);
 ```
-keyboard_"KeyCode"でそのキーが今押されている状態化を取得できる。
+keyboard_"KeyCode"でそのキーが今押されている状態化を取得できます.
 
 ### 第6章 毎フレーム実行する
 
+#### 最初のフレームだけ行う処理と毎フレーム行う処理
 
+```wapl
+if(is_first(),start(),update());
+
+fn start(){;
+    println("Start");
+    =(i,0,gbl_i32);
+    println(i);
+};
+fn update(){;
+    +=(i,1);
+    println("Update",i);
+};
+```
+is_first()は最初のフレームのみ**true**を返し,その後は**false**になります.この例ではifで関数を呼ぶことで最初のフレームとそれ以外を分けたが,以下のように**warptoif**を使うこともできます.
+```wapl
+warptoif(!(is_first()),Start);
+println("Start");
+=(i,0,i32);
+println(i);
+point Start;
++=(i,1);
+println("Update",i);
+```
+gbl属性(関数の外で定義した変数はすべてgbl属性がつく)を持つ変数はフレーム間で引き継がれます.
+
+#### タイマー
+
+```wapl
+if(is_first(),start(),update());
+fn start(){;
+    =(deltaTime,0,gbl_f64);
+    =(back_deltaTime,0,gbl_f64);
+    set_timer(back_delta);
+    =(now,0,gbl_f64);
+};
+fn update(){;
+    clear_output();
+    =(back_deltaTime,get_timer(back_delta),gbl_f64);
+    set_timer(delta);
+    +=(now,+(deltaTime,back_deltaTime));
+    println(now);
+    =(deltaTime,get_timer(delta),gbl_f64);
+    set_timer(back_delta);
+};
+```
+
+**set_timer**でタイマーを名前を付けて0秒に合わせて動かし始めます.**get_timer**でそのタイマーの時間を読みます.タイマーはどこからでもset,getができます.<br>
+**set_timer**の名前はString型の変数を入れることも可能で,名前をString型でそのまま返すので以下のようにしてあたかもその関数の中からしかアクセスできないように見せることもできます.
+```wapl
+main();
+fn main(){;
+    clear_output();
+    =(name,set_timer("hoge"),String);
+    =(time,get_timer(name),f64);
+    print(time);
+};
+```
+
+### 第7章 ここまでで紹介してない関数,機能一覧
+
+```wapl
+//MEはこのインタプリタを持つGameObject自身;
+=(gameObject,ME,gob);
+
+//コメントアウト;//コメントアウトもセミコロンで終わるように注意;
+
+//printは改行なし,printlnは改行ありで出力;
+print("Hello","World");
+//HelloWorld;
+println("Hello","World");
+//Hello;
+//World;
+
+//出力欄をすべて消す;
+clear_output();
+
+=(p,to_ptr(10),ptr);//数値をそのままポインタとして扱う;
+
+=(a,1,i32);
+alias(b,ptr(a));//aとbは同じアドレスの値を指すようになり,変数の名前だけが異なる;
+
+//文字列を一文字ずつに分解して配列(状態2)にする;
+=(hello,chars("Hello"),vec);//"H","e","l","l","o";
+
+//明示的な型変換;
+//基本的に数値計算では先頭の値の型に暗黙的に変換されるが,==(a,b)などでは変換されないので,明示的に変換する必要がある;
+=(i,as(i32,2.5),i32);
+
+//無限ループの可能性を検出;
+//この言語はUnityのゲーム内で動かすことを想定しているため1フレームに極端に長い時間をかけてしまうわけにはいきません.そこで,1フレームで同じラベルにワープできる回数に10000回という上限を設けてそれを超えた際には警告を出力に出すようになっています
+point Inf;
+warpto(Inf);//無限ループの可能性があります:Inf;
+
+```
